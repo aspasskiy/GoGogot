@@ -24,7 +24,7 @@ func DefaultCompactionConfig() CompactionConfig {
 		Threshold:      0.8,
 		SafetyMargin:   1.2,
 		PreserveRecent: 5,
-		SummaryPrompt:  "Summarize the conversation so far. Preserve decisions, TODOs, constraints, errors, file paths mentioned, and the current plan.",
+		SummaryPrompt:  "Summarize the conversation so far. Preserve decisions, TODOs, constraints, errors, file paths mentioned, the current plan, and task_plan checklist state (task IDs, titles, statuses).",
 	}
 }
 

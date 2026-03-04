@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -9,6 +10,8 @@ import (
 	"gogogot/core/prompt"
 	"gogogot/core/store"
 	"gogogot/infra/llm"
+	"gogogot/infra/llm/types"
+	"gogogot/tools"
 	"gogogot/tools/system"
 
 	"github.com/rs/zerolog/log"
@@ -30,11 +33,15 @@ type Agent struct {
 	config      AgentConfig
 	session     *Session
 	registry    *system.Registry
+	localTools  map[string]tools.Tool
 	beforeHooks []BeforeToolCallFunc
 	afterHooks  []AfterToolCallFunc
 }
 
 func New(client llm.LLM, chat *store.Chat, config AgentConfig, registry *system.Registry) *Agent {
+	tp := system.NewTaskPlan()
+	tpTool := system.TaskPlanTool(tp)
+
 	a := &Agent{
 		client:   client,
 		Chat:     chat,
@@ -42,12 +49,39 @@ func New(client llm.LLM, chat *store.Chat, config AgentConfig, registry *system.
 		config:   config,
 		session:  NewSession(chat.ID, ""),
 		registry: registry,
+		localTools: map[string]tools.Tool{
+			tpTool.Name: tpTool,
+		},
 	}
 
 	ld := NewLoopDetector(0)
 	a.AddBeforeHook(ld.BeforeHook())
 
 	return a
+}
+
+// localToolDefs returns LLM tool definitions for session-scoped tools.
+func (a *Agent) localToolDefs() []types.ToolDef {
+	defs := make([]types.ToolDef, 0, len(a.localTools))
+	for _, t := range a.localTools {
+		defs = append(defs, types.ToolDef{
+			Name:        t.Name,
+			Description: t.Description,
+			Parameters:  t.Parameters,
+			Required:    t.Required,
+		})
+	}
+	return defs
+}
+
+// executeLocal tries to dispatch a tool call to a session-scoped tool.
+// Returns the result and true if handled, or zero value and false otherwise.
+func (a *Agent) executeLocal(ctx context.Context, name string, input map[string]any) (tools.Result, bool) {
+	t, ok := a.localTools[name]
+	if !ok {
+		return tools.Result{}, false
+	}
+	return t.Handler(ctx, input), true
 }
 
 func (a *Agent) AddBeforeHook(fn BeforeToolCallFunc) {

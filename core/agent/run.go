@@ -121,7 +121,8 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		}
 
 		resp, err := a.client.Call(ctx, msgs, llm.CallOptions{
-			System: prompt.SystemPrompt(a.config.PromptCtx),
+			System:     prompt.SystemPrompt(a.config.PromptCtx),
+			ExtraTools: a.localToolDefs(),
 		})
 		if err != nil {
 			a.emit(EventError, map[string]any{"error": err.Error()})
@@ -213,7 +214,10 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			}
 
 			start := time.Now()
-			result := a.registry.Execute(ctx, tc.ToolName, input)
+			result, handled := a.executeLocal(ctx, tc.ToolName, input)
+			if !handled {
+				result = a.registry.Execute(ctx, tc.ToolName, input)
+			}
 			elapsed := time.Since(start)
 
 			callResult := &ToolCallResult{

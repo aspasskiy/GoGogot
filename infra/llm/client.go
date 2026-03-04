@@ -34,6 +34,7 @@ type CallOptions struct {
 	SystemAppend string
 	Memory       string
 	NoTools      bool
+	ExtraTools   []ToolDef
 }
 
 type Client struct {
@@ -84,6 +85,9 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 	var tools []ToolDef
 	if !opts.NoTools {
 		tools = c.tools
+		if len(opts.ExtraTools) > 0 {
+			tools = append(append([]ToolDef{}, c.tools...), opts.ExtraTools...)
+		}
 	}
 
 	logCallStart(c.model, sys, messages, tools, c.provider.Format)

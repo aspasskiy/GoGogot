@@ -22,6 +22,7 @@ func SystemPrompt(ctx PromptContext) string {
 		buildCoreIdentity(ctx),
 		buildSafetySection(),
 		buildToolStyleSection(),
+		buildWorkStrategySection(),
 		buildIdentityToolsSection(),
 		buildMemorySection(),
 		buildSkillsSection(),
@@ -68,6 +69,17 @@ func buildToolStyleSection() string {
 	return `TOOL CALL STYLE: Do not narrate routine, low-risk tool calls — just execute them.
 Narrate only when it helps: multi-step work, complex debugging, sensitive actions (deletions, config changes), or when explicitly asked.
 Keep narration brief and value-dense. Avoid repeating obvious steps.`
+}
+
+func buildWorkStrategySection() string {
+	return `HOW TO WORK:
+- For complex or multi-step tasks: break them into steps BEFORE acting. State your plan briefly, then execute step by step.
+- Use task_plan to track progress on multi-step work. Create a checklist, mark steps as you go.
+- After completing work: review your output for correctness before reporting done.
+- When uncertain: ask the user rather than guessing.
+- When stuck: try a different approach instead of repeating the same one.
+- Keep sub-tasks small and focused. Verify each result before moving to the next step.
+- For simple/routine tasks: just do them, no planning overhead needed.`
 }
 
 func buildIdentityToolsSection() string {
