@@ -3,7 +3,7 @@ package agent
 import (
 	"context"
 	"log/slog"
-	"gogogot/infra/llm/anthropic"
+	"gogogot/infra/llm/types"
 
 	"gogogot/core/agent/orchestration"
 	"gogogot/infra/llm"
@@ -41,8 +41,8 @@ func (a *Agent) maybeCompact(ctx context.Context) error {
 }
 
 func (a *Agent) summarize(ctx context.Context, prompt string) (string, error) {
-	msgs := []anthropic.Message{
-		anthropic.NewUserMessage(anthropic.TextBlock(prompt)),
+	msgs := []types.Message{
+		types.NewUserMessage(types.TextBlock(prompt)),
 	}
 	resp, err := a.client.Call(ctx, msgs, llm.CallOptions{
 		System:  a.config.Compaction.SummaryPrompt,

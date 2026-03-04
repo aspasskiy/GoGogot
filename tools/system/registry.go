@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"gogogot/infra/llm/anthropic"
+	"gogogot/infra/llm/types"
 	"gogogot/tools"
 )
 
@@ -30,10 +30,10 @@ func (r *Registry) Execute(ctx context.Context, name string, input map[string]an
 	return t.Handler(ctx, input)
 }
 
-func (r *Registry) Definitions() []anthropic.ToolDef {
-	out := make([]anthropic.ToolDef, 0, len(r.tt))
+func (r *Registry) Definitions() []types.ToolDef {
+	out := make([]types.ToolDef, 0, len(r.tt))
 	for _, t := range r.tt {
-		out = append(out, anthropic.ToolDef{
+		out = append(out, types.ToolDef{
 			Name:        t.Name,
 			Description: t.Description,
 			Parameters:  t.Parameters,

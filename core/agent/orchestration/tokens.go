@@ -1,7 +1,7 @@
 package orchestration
 
 import (
-	"gogogot/infra/llm/anthropic"
+	"gogogot/infra/llm/types"
 )
 
 const charsPerToken = 4
@@ -17,7 +17,7 @@ func EstimateTokens(messages []Message) int {
 	return chars / charsPerToken
 }
 
-func estimateBlocksChars(blocks []anthropic.ContentBlock) int {
+func estimateBlocksChars(blocks []types.ContentBlock) int {
 	var n int
 	for _, b := range blocks {
 		switch b.Type {

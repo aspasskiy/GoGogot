@@ -1,13 +1,13 @@
 package orchestration
 
 import (
-	"gogogot/infra/llm/anthropic"
+	"gogogot/infra/llm/types"
 	"time"
 )
 
 type Message struct {
 	Role      string // "user" | "assistant"
-	Content   []anthropic.ContentBlock
+	Content   []types.ContentBlock
 	Timestamp time.Time
 	Usage     *Usage
 	Metadata  map[string]any
@@ -46,7 +46,7 @@ func (s *Session) CompactAll(reason string) {
 	s.messages = []Message{
 		{
 			Role:      "assistant",
-			Content:   []anthropic.ContentBlock{anthropic.TextBlock("Context compacted. Reason: " + reason)},
+			Content:   []types.ContentBlock{types.TextBlock("Context compacted. Reason: " + reason)},
 			Timestamp: time.Now(),
 		},
 	}

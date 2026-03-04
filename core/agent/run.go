@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
-	"gogogot/infra/llm/anthropic"
+	"gogogot/infra/llm/types"
 	"strings"
 	"time"
 
@@ -39,7 +39,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		})
 	}()
 
-	var userBlocks []anthropic.ContentBlock
+	var userBlocks []types.ContentBlock
 	if len(attachments) > 0 {
 		tmpDir := filepath.Join(os.TempDir(), "gogogot-uploads",
 			fmt.Sprintf("%s-%d", a.Chat.ID, time.Now().UnixNano()))
@@ -49,7 +49,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			defer os.RemoveAll(tmpDir)
 		}
 
-		var imageBlocks []anthropic.ContentBlock
+		var imageBlocks []types.ContentBlock
 		var paths []string
 		nameCount := map[string]int{}
 
@@ -64,7 +64,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 
 			if strings.HasPrefix(att.MimeType, "image/") {
 				b64 := base64.StdEncoding.EncodeToString(att.Data)
-				imageBlocks = append(imageBlocks, anthropic.ImageBlock(att.MimeType, b64))
+				imageBlocks = append(imageBlocks, types.ImageBlock(att.MimeType, b64))
 			}
 		}
 
@@ -76,10 +76,10 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		} else {
 			textBlock = info
 		}
-		userBlocks = append(userBlocks, anthropic.TextBlock(textBlock))
+		userBlocks = append(userBlocks, types.TextBlock(textBlock))
 		userBlocks = append(userBlocks, imageBlocks...)
 	} else {
-		userBlocks = []anthropic.ContentBlock{anthropic.TextBlock(task)}
+		userBlocks = []types.ContentBlock{types.TextBlock(task)}
 	}
 
 	a.session.Append(orchestration.Message{
@@ -110,13 +110,13 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 
 		a.emit(orchestration.EventLLMStart, nil)
 
-		msgs := make([]anthropic.Message, 0, len(a.session.Messages()))
+		msgs := make([]types.Message, 0, len(a.session.Messages()))
 		for _, msg := range a.session.Messages() {
-			role := anthropic.RoleUser
+			role := types.RoleUser
 			if msg.Role == "assistant" {
-				role = anthropic.RoleAssistant
+				role = types.RoleAssistant
 			}
-			msgs = append(msgs, anthropic.Message{Role: role, Content: msg.Content})
+			msgs = append(msgs, types.Message{Role: role, Content: msg.Content})
 		}
 
 		resp, err := a.client.Call(ctx, msgs, llm.CallOptions{
@@ -136,8 +136,8 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 
 		a.emit(orchestration.EventLLMResponse, map[string]any{"usage": usage})
 
-		var assistantBlocks []anthropic.ContentBlock
-		var toolCalls []anthropic.ContentBlock
+		var assistantBlocks []types.ContentBlock
+		var toolCalls []types.ContentBlock
 		var textContent string
 
 		for _, block := range resp.Content {
@@ -174,7 +174,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		}
 
 		slog.Debug("agent executing tools", "count", len(toolCalls))
-		var toolResultBlocks []anthropic.ContentBlock
+		var toolResultBlocks []types.ContentBlock
 		for _, tc := range toolCalls {
 			slog.Info("tool call", "name", tc.ToolName, "input_size", len(tc.ToolInput))
 			a.emit(orchestration.EventToolStart, map[string]any{"name": tc.ToolName})
@@ -200,7 +200,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 				if err := hook(ctx, callCtx); err != nil {
 					slog.Warn("before-hook blocked tool call", "tool", tc.ToolName, "reason", err)
 					a.emit(orchestration.EventLoopWarning, map[string]any{"name": tc.ToolName, "reason": err.Error()})
-					toolResultBlocks = append(toolResultBlocks, anthropic.ToolResultBlock(
+					toolResultBlocks = append(toolResultBlocks, types.ToolResultBlock(
 						tc.ToolUseID, err.Error(), true,
 					))
 					blocked = true
@@ -227,7 +227,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			slog.Info("tool result", "name", tc.ToolName, "is_err", result.IsErr, "output_size", len(result.Output), "duration", elapsed)
 			a.emit(orchestration.EventToolEnd, map[string]any{"name": tc.ToolName, "result": result.Output, "duration_ms": elapsed.Milliseconds()})
 
-			toolResultBlocks = append(toolResultBlocks, anthropic.ToolResultBlock(
+			toolResultBlocks = append(toolResultBlocks, types.ToolResultBlock(
 				tc.ToolUseID,
 				result.Output,
 				result.IsErr,

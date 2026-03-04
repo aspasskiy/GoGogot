@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"time"
 
+	"gogogot/infra/llm/types"
+
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
 )
@@ -30,10 +32,10 @@ func (b *Backend) Call(
 	ctx context.Context,
 	model string,
 	systemPrompt string,
-	messages []Message,
-	tools []ToolDef,
+	messages []types.Message,
+	tools []types.ToolDef,
 	maxTokens int,
-) (*Response, error) {
+) (*types.Response, error) {
 	anthMsgs := messagesToAnthropic(messages)
 	anthTools := toolDefsToAnthropic(tools)
 
@@ -67,7 +69,7 @@ func (b *Backend) Call(
 	return anthropicToResponse(msg), nil
 }
 
-func messagesToAnthropic(msgs []Message) []anthropic.MessageParam {
+func messagesToAnthropic(msgs []types.Message) []anthropic.MessageParam {
 	out := make([]anthropic.MessageParam, 0, len(msgs))
 	for _, m := range msgs {
 		var blocks []anthropic.ContentBlockParamUnion
@@ -93,7 +95,7 @@ func messagesToAnthropic(msgs []Message) []anthropic.MessageParam {
 		}
 
 		role := anthropic.MessageParamRoleUser
-		if m.Role == RoleAssistant {
+		if m.Role == types.RoleAssistant {
 			role = anthropic.MessageParamRoleAssistant
 		}
 		out = append(out, anthropic.MessageParam{Role: role, Content: blocks})
@@ -101,7 +103,7 @@ func messagesToAnthropic(msgs []Message) []anthropic.MessageParam {
 	return out
 }
 
-func toolDefsToAnthropic(defs []ToolDef) []anthropic.ToolUnionParam {
+func toolDefsToAnthropic(defs []types.ToolDef) []anthropic.ToolUnionParam {
 	out := make([]anthropic.ToolUnionParam, 0, len(defs))
 	for _, d := range defs {
 		out = append(out, anthropic.ToolUnionParam{
@@ -118,8 +120,8 @@ func toolDefsToAnthropic(defs []ToolDef) []anthropic.ToolUnionParam {
 	return out
 }
 
-func anthropicToResponse(msg *anthropic.Message) *Response {
-	resp := &Response{
+func anthropicToResponse(msg *anthropic.Message) *types.Response {
+	resp := &types.Response{
 		ID:           msg.ID,
 		StopReason:   string(msg.StopReason),
 		InputTokens:  int(msg.Usage.InputTokens),
@@ -128,11 +130,11 @@ func anthropicToResponse(msg *anthropic.Message) *Response {
 	for _, block := range msg.Content {
 		switch block.Type {
 		case "text":
-			resp.Content = append(resp.Content, TextBlock(block.AsText().Text))
+			resp.Content = append(resp.Content, types.TextBlock(block.AsText().Text))
 		case "tool_use":
 			tu := block.AsToolUse()
 			raw, _ := json.Marshal(tu.Input)
-			resp.Content = append(resp.Content, ToolUseBlock(tu.ID, tu.Name, raw))
+			resp.Content = append(resp.Content, types.ToolUseBlock(tu.ID, tu.Name, raw))
 		}
 	}
 	return resp

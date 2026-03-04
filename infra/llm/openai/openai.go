@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"gogogot/infra/llm/anthropic"
 	"strings"
 	"time"
+
+	"gogogot/infra/llm/types"
 
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
@@ -30,10 +31,10 @@ func (b *Backend) Call(
 	ctx context.Context,
 	model string,
 	systemPrompt string,
-	messages []anthropic.Message,
-	tools []anthropic.ToolDef,
+	messages []types.Message,
+	tools []types.ToolDef,
 	maxTokens int,
-) (*anthropic.Response, error) {
+) (*types.Response, error) {
 	oaiMsgs := messagesToOpenAI(model, systemPrompt, messages)
 	oaiTools := toolDefsToOpenAI(tools)
 
@@ -66,7 +67,7 @@ func (b *Backend) Call(
 	return openaiToResponse(resp), nil
 }
 
-func messagesToOpenAI(model, system string, msgs []anthropic.Message) []openai.ChatCompletionMessageParamUnion {
+func messagesToOpenAI(model, system string, msgs []types.Message) []openai.ChatCompletionMessageParamUnion {
 	var out []openai.ChatCompletionMessageParamUnion
 
 	if system != "" {
@@ -77,7 +78,7 @@ func messagesToOpenAI(model, system string, msgs []anthropic.Message) []openai.C
 
 	for _, msg := range msgs {
 		switch msg.Role {
-		case anthropic.RoleUser:
+		case types.RoleUser:
 			var parts []openai.ChatCompletionContentPartUnionParam
 			var toolResults []openai.ChatCompletionMessageParamUnion
 			hasImage := false
@@ -114,7 +115,7 @@ func messagesToOpenAI(model, system string, msgs []anthropic.Message) []openai.C
 			}
 			out = append(out, toolResults...)
 
-		case anthropic.RoleAssistant:
+		case types.RoleAssistant:
 			var text string
 			var toolCalls []openai.ChatCompletionMessageToolCallParam
 
@@ -147,7 +148,7 @@ func messagesToOpenAI(model, system string, msgs []anthropic.Message) []openai.C
 	return out
 }
 
-func toolDefsToOpenAI(defs []anthropic.ToolDef) []openai.ChatCompletionToolParam {
+func toolDefsToOpenAI(defs []types.ToolDef) []openai.ChatCompletionToolParam {
 	var out []openai.ChatCompletionToolParam
 	for _, d := range defs {
 		params := shared.FunctionParameters{
@@ -170,8 +171,8 @@ func toolDefsToOpenAI(defs []anthropic.ToolDef) []openai.ChatCompletionToolParam
 	return out
 }
 
-func openaiToResponse(resp *openai.ChatCompletion) *anthropic.Response {
-	r := &anthropic.Response{
+func openaiToResponse(resp *openai.ChatCompletion) *types.Response {
+	r := &types.Response{
 		ID:           resp.ID,
 		InputTokens:  int(resp.Usage.PromptTokens),
 		OutputTokens: int(resp.Usage.CompletionTokens),
@@ -196,11 +197,11 @@ func openaiToResponse(resp *openai.ChatCompletion) *anthropic.Response {
 	}
 
 	if choice.Message.Content != "" {
-		r.Content = append(r.Content, anthropic.TextBlock(choice.Message.Content))
+		r.Content = append(r.Content, types.TextBlock(choice.Message.Content))
 	}
 
 	for _, tc := range choice.Message.ToolCalls {
-		r.Content = append(r.Content, anthropic.ToolUseBlock(
+		r.Content = append(r.Content, types.ToolUseBlock(
 			tc.ID,
 			tc.Function.Name,
 			json.RawMessage(tc.Function.Arguments),

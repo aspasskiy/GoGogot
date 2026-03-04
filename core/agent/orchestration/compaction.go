@@ -3,7 +3,7 @@ package orchestration
 import (
 	"context"
 	"fmt"
-	"gogogot/infra/llm/anthropic"
+	"gogogot/infra/llm/types"
 	"strings"
 	"time"
 )
@@ -63,7 +63,7 @@ func (s *Session) Compact(ctx context.Context, cfg CompactionConfig, summarize S
 	compacted := make([]Message, 0, 1+len(recent))
 	compacted = append(compacted, Message{
 		Role:      "user",
-		Content:   []anthropic.ContentBlock{anthropic.TextBlock("[Context Summary]\n" + summary)},
+		Content:   []types.ContentBlock{types.TextBlock("[Context Summary]\n" + summary)},
 		Timestamp: time.Now(),
 		Metadata:  map[string]any{"compacted": true, "original_messages": len(old)},
 	})
@@ -83,7 +83,7 @@ func renderTranscript(msgs []Message) string {
 	return sb.String()
 }
 
-func contentToString(blocks []anthropic.ContentBlock) string {
+func contentToString(blocks []types.ContentBlock) string {
 	var sb strings.Builder
 	for _, b := range blocks {
 		switch b.Type {

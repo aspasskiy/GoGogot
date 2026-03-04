@@ -6,14 +6,21 @@ import (
 
 	anthpkg "gogogot/infra/llm/anthropic"
 	oaipkg "gogogot/infra/llm/openai"
+	"gogogot/infra/llm/types"
 )
 
 type (
-	Message      = anthpkg.Message
-	Response     = anthpkg.Response
-	ToolDef      = anthpkg.ToolDef
-	ContentBlock = anthpkg.ContentBlock
+	Message      = types.Message
+	Response     = types.Response
+	ToolDef      = types.ToolDef
+	ContentBlock = types.ContentBlock
 )
+
+type Backend interface {
+	Call(ctx context.Context, model string, systemPrompt string,
+		messages []types.Message, tools []types.ToolDef, maxTokens int,
+	) (*types.Response, error)
+}
 
 type LLM interface {
 	Call(ctx context.Context, messages []Message, opts CallOptions) (*Response, error)
@@ -30,28 +37,27 @@ type CallOptions struct {
 }
 
 type Client struct {
-	anth     *anthpkg.Backend
-	oai      *oaipkg.Backend
+	backend  Backend
 	model    string
 	tools    []ToolDef
 	provider Provider
 }
 
 func NewClient(p Provider, toolDefs []ToolDef) *Client {
-	c := &Client{
+	var backend Backend
+	switch p.Format {
+	case "openai":
+		backend = oaipkg.NewBackend(p.BaseURL, p.APIKey)
+	default:
+		backend = anthpkg.NewBackend(p.APIKey, p.BaseURL)
+	}
+
+	return &Client{
+		backend:  backend,
 		model:    p.Model,
 		tools:    toolDefs,
 		provider: p,
 	}
-
-	switch p.Format {
-	case "openai":
-		c.oai = oaipkg.NewBackend(p.BaseURL, p.APIKey)
-	default:
-		c.anth = anthpkg.NewBackend(p.APIKey, p.BaseURL)
-	}
-
-	return c
 }
 
 func (c *Client) ModelID() string {
@@ -89,9 +95,5 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 		"backend", c.provider.Format,
 	)
 
-	if c.oai != nil {
-		return c.oai.Call(ctx, c.model, sys, messages, tools, 4096)
-	}
-
-	return c.anth.Call(ctx, c.model, sys, messages, tools, 4096)
+	return c.backend.Call(ctx, c.model, sys, messages, tools, 4096)
 }
