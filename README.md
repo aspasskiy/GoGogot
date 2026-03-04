@@ -117,25 +117,16 @@ Copy an entry, change 3 fields, restart. No recompilation needed. The `api_key_e
 You pick the price/quality tradeoff. All models work out of the box — switch with one env var.
 
 
-| Model                         | Input (per 1M tokens) | Output (per 1M tokens) |
-| ----------------------------- | --------------------- | ---------------------- |
-| Qwen3 235B A22B               | $0.14                 | $0.30                  |
-| Llama 4 Maverick              | $0.19                 | $0.81                  |
-| DeepSeek V3-0324              | Free / $0.28          | Free / $1.10           |
-| MiniMax M2.5 (via OpenRouter) | $0.30                 | $1.10                  |
-| Gemini 2.5 Pro                | $1.25                 | $10.00                 |
-| Claude Sonnet 4.6             | $5.00                 | $25.00                 |
+| Model                         | Input (per 1M tokens) | Output (per 1M tokens) | ~Cost per session* |
+| ----------------------------- | --------------------- | ---------------------- | ------------------ |
+| Qwen3 235B A22B               | $0.14                 | $0.30                  | ~$0.02             |
+| Llama 4 Maverick              | $0.19                 | $0.81                  | ~$0.02             |
+| DeepSeek V3-0324              | Free / $0.28          | Free / $1.10           | ~$0.02             |
+| MiniMax M2.5 (via OpenRouter) | $0.30                 | $1.10                  | ~$0.03             |
+| Gemini 2.5 Pro                | $1.25                 | $10.00                 | ~$0.16             |
+| Claude Sonnet 4.6             | $5.00                 | $25.00                 | ~$0.50             |
 
-
-A typical agent session (~50K input, ~10K output):
-
-
-| Model              | Cost per session |
-| ------------------ | ---------------- |
-| Qwen3 / DeepSeek   | ~$0.02           |
-| MiniMax            | ~$0.03           |
-| Gemini 2.5 Pro     | ~$0.16           |
-| Claude Sonnet 4.6  | ~$0.50           |
+\* Typical session: ~50K input + ~10K output tokens.
 
 
 For routine tasks — daily digests, file management, web lookups — DeepSeek or MiniMax are more than enough. Switch to Claude or Gemini for complex reasoning when you need it.
