@@ -5,12 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
-	"gogogot/tools"
 	"strings"
 	"time"
+
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 type braveResponse struct {
@@ -47,11 +49,11 @@ func webSearch(ctx context.Context, input map[string]any, apiKey string) tools.R
 	}
 
 	if apiKey == "" {
-		slog.Warn("web_search: BRAVE_API_KEY not set")
+		log.Warn().Msg("web_search: BRAVE_API_KEY not set")
 		return tools.Result{Output: "BRAVE_API_KEY not set — web search disabled", IsErr: true}
 	}
 
-	slog.Debug("web_search", "query", query)
+	log.Debug().Str("query", query).Msg("web_search")
 
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -67,7 +69,7 @@ func webSearch(ctx context.Context, input map[string]any, apiKey string) tools.R
 	start := time.Now()
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		slog.Debug("web_search http error", "query", query, "error", err)
+		log.Debug().Str("query", query).Err(err).Msg("web_search http error")
 		return tools.Result{Output: fmt.Sprintf("http error: %v", err), IsErr: true}
 	}
 	defer resp.Body.Close()
@@ -77,7 +79,7 @@ func webSearch(ctx context.Context, input map[string]any, apiKey string) tools.R
 		return tools.Result{Output: fmt.Sprintf("read body error: %v", err), IsErr: true}
 	}
 
-	slog.Debug("web_search response", "query", query, "status", resp.StatusCode, "body_len", len(body), "elapsed", time.Since(start))
+	log.Debug().Str("query", query).Int("status", resp.StatusCode).Int("body_len", len(body)).Dur("elapsed", time.Since(start)).Msg("web_search response")
 
 	if resp.StatusCode != http.StatusOK {
 		return tools.Result{Output: fmt.Sprintf("brave API %d: %s", resp.StatusCode, string(body)), IsErr: true}
@@ -88,7 +90,7 @@ func webSearch(ctx context.Context, input map[string]any, apiKey string) tools.R
 		return tools.Result{Output: fmt.Sprintf("json decode error: %v", err), IsErr: true}
 	}
 
-	slog.Debug("web_search results", "query", query, "count", len(br.Web.Results))
+	log.Debug().Str("query", query).Int("count", len(br.Web.Results)).Msg("web_search results")
 
 	var sb strings.Builder
 	for i, r := range br.Web.Results {

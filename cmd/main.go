@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,12 +20,13 @@ import (
 	"gogogot/tools/system"
 
 	"github.com/joho/godotenv"
+	"github.com/rs/zerolog/log"
 )
 
 func main() {
 	_ = godotenv.Load()
 
-	modelFlag := flag.String("model", "", "model: claude, minimax (default: first available)")
+	modelFlag := flag.String("model", "", "model ID from models.json (default: first available)")
 	flag.Parse()
 
 	cfg, err := config.Load()
@@ -36,11 +36,6 @@ func main() {
 	}
 	if *modelFlag != "" {
 		cfg.Model = *modelFlag
-	}
-
-	if !cfg.HasAnyProvider() {
-		fmt.Fprintln(os.Stderr, "error: set ANTHROPIC_API_KEY or OPENROUTER_API_KEY in .env")
-		os.Exit(1)
 	}
 
 	if err := logger.Init(cfg.DataDir, cfg.LogLevel); err != nil {
@@ -96,7 +91,7 @@ func main() {
 
 	fmt.Printf("Sofie is running [%s, %s]. Press Ctrl+C to stop.\n", t.Name(), provider.Label)
 	if err := b.Run(ctx); err != nil && ctx.Err() == nil {
-		slog.Error("bridge run error", "error", err)
+		log.Error().Err(err).Msg("bridge run error")
 	}
 	fmt.Println("Shutting down.")
 }
@@ -146,7 +141,7 @@ func buildTaskExecutor(
 		if finalText != "" {
 			prefix := fmt.Sprintf("⏰ [cron:%s]\n\n", taskID)
 			if err := t.SendText(ctx, ownerChannelID, prefix+finalText); err != nil {
-				slog.Error("scheduler: failed to send result to owner", "task", taskID, "error", err)
+				log.Error().Err(err).Str("task", taskID).Msg("scheduler: failed to send result to owner")
 			}
 		}
 
@@ -155,9 +150,12 @@ func buildTaskExecutor(
 }
 
 func selectProvider(cfg *config.Config) (*llm.Provider, error) {
-	providers := llm.AvailableProviders(cfg)
+	providers, err := llm.LoadProviders(cfg.DataDir)
+	if err != nil {
+		return nil, err
+	}
 	if len(providers) == 0 {
-		return nil, fmt.Errorf("no LLM providers available")
+		return nil, fmt.Errorf("no LLM providers available — set ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
 	}
 	if cfg.Model == "" {
 		return &providers[0], nil

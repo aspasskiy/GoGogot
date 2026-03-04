@@ -3,10 +3,11 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"gogogot/core/store"
 	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 func IdentityTools() []tools.Tool {
@@ -64,10 +65,10 @@ func soulWrite(_ context.Context, input map[string]any) tools.Result {
 		return tools.Result{Output: "content parameter is required", IsErr: true}
 	}
 	if err := store.WriteSoul(content); err != nil {
-		slog.Error("soul_write failed", "error", err)
+		log.Error().Err(err).Msg("soul_write failed")
 		return tools.Result{Output: "error writing soul.md: " + err.Error(), IsErr: true}
 	}
-	slog.Info("soul_write", "content_len", len(content))
+	log.Info().Int("content_len", len(content)).Msg("soul_write")
 	return tools.Result{Output: fmt.Sprintf("soul.md updated (%d bytes)", len(content))}
 }
 
@@ -85,9 +86,9 @@ func userWrite(_ context.Context, input map[string]any) tools.Result {
 		return tools.Result{Output: "content parameter is required", IsErr: true}
 	}
 	if err := store.WriteUser(content); err != nil {
-		slog.Error("user_write failed", "error", err)
+		log.Error().Err(err).Msg("user_write failed")
 		return tools.Result{Output: "error writing user.md: " + err.Error(), IsErr: true}
 	}
-	slog.Info("user_write", "content_len", len(content))
+	log.Info().Int("content_len", len(content)).Msg("user_write")
 	return tools.Result{Output: fmt.Sprintf("user.md updated (%d bytes)", len(content))}
 }

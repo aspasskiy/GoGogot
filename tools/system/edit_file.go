@@ -3,10 +3,12 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
-	"gogogot/tools"
 	"strings"
+
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 func EditFileTool() tools.Tool {
@@ -51,7 +53,7 @@ func editFile(_ context.Context, input map[string]any) tools.Result {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		slog.Debug("edit_file read error", "path", path, "error", err)
+		log.Debug().Str("path", path).Err(err).Msg("edit_file read error")
 		return tools.Result{Output: fmt.Sprintf("read error: %v", err), IsErr: true}
 	}
 
@@ -69,7 +71,7 @@ func editFile(_ context.Context, input map[string]any) tools.Result {
 	}
 
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
-		slog.Debug("edit_file write error", "path", path, "error", err)
+		log.Debug().Str("path", path).Err(err).Msg("edit_file write error")
 		return tools.Result{Output: fmt.Sprintf("write error: %v", err), IsErr: true}
 	}
 
@@ -77,6 +79,6 @@ func editFile(_ context.Context, input map[string]any) tools.Result {
 	if !replaceAll {
 		replaced = 1
 	}
-	slog.Debug("edit_file", "path", path, "occurrences", count, "replaced", replaced)
+	log.Debug().Str("path", path).Int("occurrences", count).Int("replaced", replaced).Msg("edit_file")
 	return tools.Result{Output: fmt.Sprintf("replaced %d occurrence(s) in %s", replaced, path)}
 }

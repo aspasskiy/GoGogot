@@ -3,11 +3,12 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"gogogot/tools"
 	"strings"
 
 	"gogogot/core/store"
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 func MemoryTools() []tools.Tool {
@@ -52,7 +53,7 @@ func MemoryTools() []tools.Tool {
 func memoryList(_ context.Context, _ map[string]any) tools.Result {
 	files, err := store.ListMemory()
 	if err != nil {
-		slog.Debug("memory_list error", "error", err)
+		log.Debug().Err(err).Msg("memory_list error")
 		return tools.Result{Output: "error listing memory: " + err.Error(), IsErr: true}
 	}
 	if len(files) == 0 {
@@ -72,7 +73,7 @@ func memoryRead(_ context.Context, input map[string]any) tools.Result {
 	}
 	content, err := store.ReadMemory(file)
 	if err != nil {
-		slog.Debug("memory_read error", "file", file, "error", err)
+		log.Debug().Str("file", file).Err(err).Msg("memory_read error")
 		return tools.Result{Output: err.Error(), IsErr: true}
 	}
 	return tools.Result{Output: content}
@@ -88,9 +89,9 @@ func memoryWrite(_ context.Context, input map[string]any) tools.Result {
 		return tools.Result{Output: "content parameter is required", IsErr: true}
 	}
 	if err := store.WriteMemory(file, content); err != nil {
-		slog.Error("memory_write failed", "file", file, "error", err)
+		log.Error().Err(err).Str("file", file).Msg("memory_write failed")
 		return tools.Result{Output: "error writing memory: " + err.Error(), IsErr: true}
 	}
-	slog.Info("memory_write", "file", file, "content_len", len(content))
+	log.Info().Str("file", file).Int("content_len", len(content)).Msg("memory_write")
 	return tools.Result{Output: fmt.Sprintf("memory file %q updated (%d bytes)", file, len(content))}
 }

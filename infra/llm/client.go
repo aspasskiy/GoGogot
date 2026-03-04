@@ -2,7 +2,6 @@ package llm
 
 import (
 	"context"
-	"log/slog"
 
 	anthpkg "gogogot/infra/llm/anthropic"
 	oaipkg "gogogot/infra/llm/openai"
@@ -47,7 +46,7 @@ func NewClient(p Provider, toolDefs []ToolDef) *Client {
 	var backend Backend
 	switch p.Format {
 	case "openai":
-		backend = oaipkg.NewBackend(p.BaseURL, p.APIKey)
+		backend = oaipkg.NewBackend(p.BaseURL, p.APIKey, p.SupportsVision)
 	default:
 		backend = anthpkg.NewBackend(p.APIKey, p.BaseURL)
 	}
@@ -86,14 +85,7 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 		tools = c.tools
 	}
 
-	slog.Debug("llm.Call start",
-		"model", c.model,
-		"messages", len(messages),
-		"tools_enabled", !opts.NoTools,
-		"tools_count", len(tools),
-		"has_memory", opts.Memory != "",
-		"backend", c.provider.Format,
-	)
+	logCallStart(c.model, sys, messages, tools, c.provider.Format)
 
 	return c.backend.Call(ctx, c.model, sys, messages, tools, 4096)
 }

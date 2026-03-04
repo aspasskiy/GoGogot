@@ -1,41 +1,76 @@
 package llm
 
-import "gogogot/infra/config"
+import (
+	_ "embed"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+)
+
+//go:embed models.json
+var defaultModelsJSON []byte
 
 type Provider struct {
-	ID            string
-	Label         string
-	Model         string
-	BaseURL       string
-	APIKey        string
-	Format        string // "anthropic" (default) or "openai"
-	ContextWindow int
+	ID             string `json:"id"`
+	Label          string `json:"label"`
+	Model          string `json:"model"`
+	BaseURL        string `json:"base_url,omitempty"`
+	APIKey         string `json:"-"`
+	Format         string `json:"format,omitempty"`
+	ContextWindow  int    `json:"context_window"`
+	SupportsVision bool   `json:"supports_vision,omitempty"`
 }
 
-func AvailableProviders(cfg *config.Config) []Provider {
+type providerDef struct {
+	ID             string `json:"id"`
+	Label          string `json:"label"`
+	Model          string `json:"model"`
+	BaseURL        string `json:"base_url,omitempty"`
+	APIKeyEnv      string `json:"api_key_env"`
+	Format         string `json:"format,omitempty"`
+	ContextWindow  int    `json:"context_window"`
+	SupportsVision bool   `json:"supports_vision,omitempty"`
+}
+
+func LoadProviders(dataDir string) ([]Provider, error) {
+	data := defaultModelsJSON
+
+	if userFile := filepath.Join(dataDir, "models.json"); fileExists(userFile) {
+		b, err := os.ReadFile(userFile)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", userFile, err)
+		}
+		data = b
+	}
+
+	var defs []providerDef
+	if err := json.Unmarshal(data, &defs); err != nil {
+		return nil, fmt.Errorf("parse models.json: %w", err)
+	}
+
 	var providers []Provider
-
-	if cfg.AnthropicKey != "" {
+	for _, d := range defs {
+		apiKey := os.Getenv(d.APIKeyEnv)
+		if apiKey == "" {
+			continue
+		}
 		providers = append(providers, Provider{
-			ID:            "claude",
-			Label:         "Claude Sonnet 4.6 (Anthropic)",
-			Model:         "claude-sonnet-4-6",
-			APIKey:        cfg.AnthropicKey,
-			ContextWindow: 200_000,
+			ID:             d.ID,
+			Label:          d.Label,
+			Model:          d.Model,
+			BaseURL:        d.BaseURL,
+			APIKey:         apiKey,
+			Format:         d.Format,
+			ContextWindow:  d.ContextWindow,
+			SupportsVision: d.SupportsVision,
 		})
 	}
 
-	if cfg.OpenRouterKey != "" {
-		providers = append(providers, Provider{
-			ID:            "minimax",
-			Label:         "MiniMax M2.5 (OpenRouter)",
-			Model:         "minimax/minimax-m2.5",
-			BaseURL:       "https://openrouter.ai/api/v1",
-			APIKey:        cfg.OpenRouterKey,
-			Format:        "openai",
-			ContextWindow: 1_000_000,
-		})
-	}
+	return providers, nil
+}
 
-	return providers
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

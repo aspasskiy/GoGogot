@@ -1,0 +1,58 @@
+[
+  {
+    "id": "claude",
+    "label": "Claude Sonnet 4.6 (Anthropic)",
+    "model": "claude-sonnet-4-6",
+    "api_key_env": "ANTHROPIC_API_KEY",
+    "format": "anthropic",
+    "context_window": 200000,
+    "supports_vision": true
+  },
+  {
+    "id": "deepseek",
+    "label": "DeepSeek V3-0324 (OpenRouter)",
+    "model": "deepseek/deepseek-chat-v3-0324:free",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 128000
+  },
+  {
+    "id": "gemini",
+    "label": "Gemini 2.5 Pro (OpenRouter)",
+    "model": "google/gemini-2.5-pro-preview-03-25",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 1000000,
+    "supports_vision": true
+  },
+  {
+    "id": "minimax",
+    "label": "MiniMax M2.5 (OpenRouter)",
+    "model": "minimax/minimax-m2.5",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 1000000
+  },
+  {
+    "id": "qwen",
+    "label": "Qwen3 235B A22B (OpenRouter)",
+    "model": "qwen/qwen3-235b-a22b",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 128000
+  },
+  {
+    "id": "llama",
+    "label": "Llama 4 Maverick (OpenRouter)",
+    "model": "meta-llama/llama-4-maverick",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 1000000,
+    "supports_vision": true
+  }
+]

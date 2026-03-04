@@ -5,35 +5,36 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"gogogot/infra/llm/types"
 	"strings"
 	"time"
 
 	"gogogot/core/agent/orchestration"
-	"gogogot/infra/llm"
 	"gogogot/core/store"
+	"gogogot/infra/llm"
+	"gogogot/infra/llm/types"
 	"gogogot/infra/transport"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.Attachment) error {
 	runStart := time.Now()
-	slog.Info("agent.Run start", "chat_id", a.Chat.ID)
+	log.Info().Str("chat_id", a.Chat.ID).Msg("agent.Run start")
 
 	defer func() {
 		elapsed := time.Since(runStart)
 		a.session.TotalUsage.Duration += elapsed
 		total := a.session.TotalUsage
-		slog.Info("agent.Run done",
-			"chat_id", a.Chat.ID,
-			"elapsed", elapsed,
-			"total_input_tokens", total.InputTokens,
-			"total_output_tokens", total.OutputTokens,
-			"total_tool_calls", total.ToolCalls,
-			"total_cost_usd", total.Cost,
-		)
+		log.Info().
+			Str("chat_id", a.Chat.ID).
+			Dur("elapsed", elapsed).
+			Int("total_input_tokens", total.InputTokens).
+			Int("total_output_tokens", total.OutputTokens).
+			Int("total_tool_calls", total.ToolCalls).
+			Float64("total_cost_usd", total.Cost).
+			Msg("agent.Run done")
 		a.emit(orchestration.EventDone, map[string]any{
 			"usage": total,
 		})
@@ -44,7 +45,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		tmpDir := filepath.Join(os.TempDir(), "gogogot-uploads",
 			fmt.Sprintf("%s-%d", a.Chat.ID, time.Now().UnixNano()))
 		if err := os.MkdirAll(tmpDir, 0755); err != nil {
-			slog.Error("failed to create upload dir", "error", err)
+			log.Error().Err(err).Msg("failed to create upload dir")
 		} else {
 			defer os.RemoveAll(tmpDir)
 		}
@@ -57,7 +58,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			name := uniqueName(att.Filename, nameCount)
 			fpath := filepath.Join(tmpDir, name)
 			if err := os.WriteFile(fpath, att.Data, 0644); err != nil {
-				slog.Error("failed to save attachment", "path", fpath, "error", err)
+				log.Error().Err(err).Str("path", fpath).Msg("failed to save attachment")
 				continue
 			}
 			paths = append(paths, fpath)
@@ -96,16 +97,16 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 	for iteration := 1; ; iteration++ {
 		select {
 		case <-ctx.Done():
-			slog.Info("agent.Run cancelled", "chat_id", a.Chat.ID)
+			log.Info().Str("chat_id", a.Chat.ID).Msg("agent.Run cancelled")
 			_ = a.Chat.Save()
 			return ctx.Err()
 		default:
 		}
 
-		slog.Debug("agent loop iteration", "i", iteration, "chat_id", a.Chat.ID)
+		log.Debug().Int("i", iteration).Str("chat_id", a.Chat.ID).Msg("agent loop iteration")
 
 		if err := a.maybeCompact(ctx); err != nil {
-			slog.Error("compaction failed", "error", err)
+			log.Error().Err(err).Msg("compaction failed")
 		}
 
 		a.emit(orchestration.EventLLMStart, nil)
@@ -164,25 +165,25 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			a.Chat.Messages = append(a.Chat.Messages, store.Message{
 				Role: "assistant", Content: textContent,
 			})
-			slog.Debug("agent text response", "length", len(textContent))
+			log.Debug().Int("length", len(textContent)).Msg("agent text response")
 			a.emit(orchestration.EventLLMStream, map[string]any{"text": textContent})
 		}
 
 		if len(toolCalls) == 0 {
-			slog.Debug("no tool calls, ending agent loop")
+			log.Debug().Msg("no tool calls, ending agent loop")
 			break
 		}
 
-		slog.Debug("agent executing tools", "count", len(toolCalls))
+		log.Debug().Int("count", len(toolCalls)).Msg("agent executing tools")
 		var toolResultBlocks []types.ContentBlock
 		for _, tc := range toolCalls {
-			slog.Info("tool call", "name", tc.ToolName, "input_size", len(tc.ToolInput))
+			log.Info().Str("name", tc.ToolName).Int("input_size", len(tc.ToolInput)).Msg("tool call")
 			a.emit(orchestration.EventToolStart, map[string]any{"name": tc.ToolName})
 
 			var input map[string]any
 			if len(tc.ToolInput) > 0 {
 				if err := json.Unmarshal(tc.ToolInput, &input); err != nil {
-					slog.Error("failed to unmarshal tool input", "error", err)
+					log.Error().Err(err).Msg("failed to unmarshal tool input")
 				}
 			}
 
@@ -198,7 +199,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			var blocked bool
 			for _, hook := range a.beforeHooks {
 				if err := hook(ctx, callCtx); err != nil {
-					slog.Warn("before-hook blocked tool call", "tool", tc.ToolName, "reason", err)
+					log.Warn().Str("tool", tc.ToolName).Str("reason", err.Error()).Msg("before-hook blocked tool call")
 					a.emit(orchestration.EventLoopWarning, map[string]any{"name": tc.ToolName, "reason": err.Error()})
 					toolResultBlocks = append(toolResultBlocks, types.ToolResultBlock(
 						tc.ToolUseID, err.Error(), true,
@@ -224,7 +225,12 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 				hook(ctx, callCtx, callResult)
 			}
 
-			slog.Info("tool result", "name", tc.ToolName, "is_err", result.IsErr, "output_size", len(result.Output), "duration", elapsed)
+			log.Info().
+				Str("name", tc.ToolName).
+				Bool("is_err", result.IsErr).
+				Int("output_size", len(result.Output)).
+				Dur("duration", elapsed).
+				Msg("tool result")
 			a.emit(orchestration.EventToolEnd, map[string]any{"name": tc.ToolName, "result": result.Output, "duration_ms": elapsed.Milliseconds()})
 
 			toolResultBlocks = append(toolResultBlocks, types.ToolResultBlock(
@@ -241,7 +247,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		})
 
 		if err := a.Chat.Save(); err != nil {
-			slog.Error("agent failed to save chat", "error", err)
+			log.Error().Err(err).Msg("agent failed to save chat")
 		}
 	}
 

@@ -3,11 +3,13 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os/exec"
-	"gogogot/tools"
 	"strings"
 	"time"
+
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -55,7 +57,7 @@ func executeBash(ctx context.Context, input map[string]any) tools.Result {
 		}
 	}
 
-	slog.Debug("bash exec", "command", command, "workdir", workdir, "timeout", timeout)
+	log.Debug().Str("command", command).Str("workdir", workdir).Dur("timeout", timeout).Msg("bash exec")
 
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -78,14 +80,14 @@ func executeBash(ctx context.Context, input map[string]any) tools.Result {
 
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
-			slog.Warn("bash timeout", "command", command, "timeout", timeout, "elapsed", elapsed)
+			log.Warn().Str("command", command).Dur("timeout", timeout).Dur("elapsed", elapsed).Msg("bash timeout")
 			return tools.Result{Output: fmt.Sprintf("command timed out after %s\n%s", timeout, output), IsErr: true}
 		}
-		slog.Debug("bash exit error", "command", command, "error", err, "elapsed", elapsed)
+		log.Debug().Str("command", command).Err(err).Dur("elapsed", elapsed).Msg("bash exit error")
 		return tools.Result{Output: fmt.Sprintf("exit error: %v\n%s", err, output), IsErr: true}
 	}
 
-	slog.Debug("bash success", "command", command, "output_len", len(output), "truncated", truncated, "elapsed", elapsed)
+	log.Debug().Str("command", command).Int("output_len", len(output)).Bool("truncated", truncated).Dur("elapsed", elapsed).Msg("bash success")
 
 	if strings.TrimSpace(output) == "" {
 		output = "(no output)"

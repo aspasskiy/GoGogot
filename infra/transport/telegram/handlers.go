@@ -3,7 +3,6 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"gogogot/infra/transport"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/rs/zerolog/log"
 )
 
 func (t *Transport) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQuery, handler transport.Handler) {
@@ -98,7 +98,7 @@ func (t *Transport) convertAndDispatch(ctx context.Context, msgs []*tgbotapi.Mes
 		if msg.Document != nil {
 			att, err := t.processDocument(msg.Document)
 			if err != nil {
-				slog.Error("failed to process document", "error", err)
+				log.Error().Err(err).Msg("failed to process document")
 			} else {
 				attachments = append(attachments, att...)
 			}
@@ -107,7 +107,7 @@ func (t *Transport) convertAndDispatch(ctx context.Context, msgs []*tgbotapi.Mes
 		if len(msg.Photo) > 0 {
 			att, err := t.processPhoto(msg.Photo)
 			if err != nil {
-				slog.Error("failed to process photo", "error", err)
+				log.Error().Err(err).Msg("failed to process photo")
 			} else {
 				attachments = append(attachments, *att)
 			}
@@ -140,12 +140,12 @@ func (t *Transport) convertAndDispatch(ctx context.Context, msgs []*tgbotapi.Mes
 		text = "What's in these files?"
 	}
 
-	slog.Debug("telegram incoming message",
-		"chat_id", chatID,
-		"text_len", len(text),
-		"attachments", len(attachments),
-		"from", msgs[0].From.UserName,
-	)
+	log.Debug().
+		Int64("chat_id", chatID).
+		Int("text_len", len(text)).
+		Int("attachments", len(attachments)).
+		Str("from", msgs[0].From.UserName).
+		Msg("telegram incoming message")
 
 	if strings.HasPrefix(text, "/") {
 		cmd := strings.Fields(text)[0]
@@ -153,7 +153,7 @@ func (t *Transport) convertAndDispatch(ctx context.Context, msgs []*tgbotapi.Mes
 			handler(ctx, transport.Message{ChannelID: channelID, Text: "/stop"})
 			return
 		}
-		slog.Info("command received", "cmd", text)
+		log.Info().Str("cmd", text).Msg("command received")
 		t.handleCommand(ctx, chatID, channelID, text)
 		return
 	}
@@ -241,7 +241,7 @@ func (t *Transport) handleCommand(_ context.Context, chatID int64, channelID, te
 		msg := tgbotapi.NewMessage(chatID, "💬 Your chats:")
 		msg.ReplyMarkup = tgbotapi.NewInlineKeyboardMarkup(rows...)
 		if _, err := t.api.Send(msg); err != nil {
-			slog.Error("telegram send failed", "error", err)
+			log.Error().Err(err).Msg("telegram send failed")
 		}
 
 	case "/memory":

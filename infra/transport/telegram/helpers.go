@@ -2,17 +2,17 @@ package telegram
 
 import (
 	"fmt"
-	"log/slog"
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/rs/zerolog/log"
 )
 
 func (t *Transport) send(chatID int64, markdownText string) {
 	msg := tgbotapi.NewMessage(chatID, markdownText)
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	if _, err := t.api.Send(msg); err != nil {
-		slog.Error("telegram send failed", "error", err)
+		log.Error().Err(err).Msg("telegram send failed")
 	}
 }
 
@@ -21,7 +21,7 @@ func (t *Transport) sendAndGetID(chatID int64, markdownText string) int {
 	msg.ParseMode = tgbotapi.ModeMarkdownV2
 	sent, err := t.api.Send(msg)
 	if err != nil {
-		slog.Error("telegram send failed", "error", err)
+		log.Error().Err(err).Msg("telegram send failed")
 		return 0
 	}
 	return sent.MessageID
@@ -45,10 +45,10 @@ func (t *Transport) sendLong(chatID int64, text string) {
 		msg := tgbotapi.NewMessage(chatID, chunk)
 		msg.ParseMode = tgbotapi.ModeMarkdown
 		if _, err := t.api.Send(msg); err != nil {
-			slog.Warn("telegram markdown send failed, falling back to plain text", "error", err)
+			log.Warn().Err(err).Msg("telegram markdown send failed, falling back to plain text")
 			msg.ParseMode = ""
 			if _, err := t.api.Send(msg); err != nil {
-				slog.Error("telegram plain text send failed", "error", err)
+				log.Error().Err(err).Msg("telegram plain text send failed")
 			}
 		}
 	}
@@ -61,7 +61,7 @@ func (t *Transport) editMessage(chatID int64, messageID int, markdownText string
 	edit := tgbotapi.NewEditMessageText(chatID, messageID, markdownText)
 	edit.ParseMode = tgbotapi.ModeMarkdownV2
 	if _, err := t.api.Send(edit); err != nil {
-		slog.Debug("telegram edit failed", "error", err)
+		log.Debug().Err(err).Msg("telegram edit failed")
 	}
 }
 
@@ -71,7 +71,7 @@ func (t *Transport) deleteMessage(chatID int64, messageID int) {
 	}
 	del := tgbotapi.NewDeleteMessage(chatID, messageID)
 	if _, err := t.api.Request(del); err != nil {
-		slog.Debug("telegram delete failed", "error", err)
+		log.Debug().Err(err).Msg("telegram delete failed")
 	}
 }
 

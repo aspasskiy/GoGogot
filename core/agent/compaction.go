@@ -2,11 +2,12 @@ package agent
 
 import (
 	"context"
-	"log/slog"
-	"gogogot/infra/llm/types"
 
 	"gogogot/core/agent/orchestration"
 	"gogogot/infra/llm"
+	"gogogot/infra/llm/types"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (a *Agent) maybeCompact(ctx context.Context) error {
@@ -20,11 +21,11 @@ func (a *Agent) maybeCompact(ctx context.Context) error {
 		return nil
 	}
 
-	slog.Info("compaction triggered",
-		"estimated_tokens", estimated,
-		"context_window", ctxWindow,
-		"threshold", a.config.Compaction.Threshold,
-	)
+	log.Info().
+		Int("estimated_tokens", estimated).
+		Int("context_window", ctxWindow).
+		Float64("threshold", a.config.Compaction.Threshold).
+		Msg("compaction triggered")
 
 	err := a.session.Compact(ctx, a.config.Compaction, a.summarize)
 	if err != nil {
@@ -36,7 +37,7 @@ func (a *Agent) maybeCompact(ctx context.Context) error {
 		"before_tokens": estimated,
 		"after_tokens":  after,
 	})
-	slog.Info("compaction done", "before", estimated, "after", after)
+	log.Info().Int("before", estimated).Int("after", after).Msg("compaction done")
 	return nil
 }
 

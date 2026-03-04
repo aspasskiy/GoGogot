@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"strings"
 	"time"
 
 	"gogogot/infra/llm/types"
@@ -13,18 +11,20 @@ import (
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/shared"
+	"github.com/rs/zerolog/log"
 )
 
 type Backend struct {
-	client *openai.Client
+	client         *openai.Client
+	supportsVision bool
 }
 
-func NewBackend(baseURL, apiKey string) *Backend {
+func NewBackend(baseURL, apiKey string, supportsVision bool) *Backend {
 	c := openai.NewClient(
 		oaioption.WithBaseURL(baseURL),
 		oaioption.WithAPIKey(apiKey),
 	)
-	return &Backend{client: &c}
+	return &Backend{client: &c, supportsVision: supportsVision}
 }
 
 func (b *Backend) Call(
@@ -35,7 +35,7 @@ func (b *Backend) Call(
 	tools []types.ToolDef,
 	maxTokens int,
 ) (*types.Response, error) {
-	oaiMsgs := messagesToOpenAI(model, systemPrompt, messages)
+	oaiMsgs := messagesToOpenAI(b.supportsVision, systemPrompt, messages)
 	oaiTools := toolDefsToOpenAI(tools)
 
 	params := openai.ChatCompletionNewParams{
@@ -47,34 +47,35 @@ func (b *Backend) Call(
 		params.Tools = oaiTools
 	}
 
-	reqJSON, _ := json.Marshal(params)
-	slog.Debug("openai call start", "model", model, "messages", len(oaiMsgs), "req", string(reqJSON))
+	log.Debug().
+		Str("model", model).
+		Int("messages", len(oaiMsgs)).
+		Msg("openai call start")
+
 	start := time.Now()
 
 	resp, err := b.client.Chat.Completions.New(ctx, params)
 	elapsed := time.Since(start)
 	if err != nil {
-		slog.Error("openai call failed", "error", err, "elapsed", elapsed)
+		log.Error().Err(err).Dur("elapsed", elapsed).Msg("openai call failed")
 		return nil, err
 	}
 
-	slog.Info("openai call completed",
-		"elapsed", elapsed,
-		"prompt_tokens", resp.Usage.PromptTokens,
-		"completion_tokens", resp.Usage.CompletionTokens,
-	)
+	log.Info().
+		Dur("elapsed", elapsed).
+		Int64("prompt_tokens", resp.Usage.PromptTokens).
+		Int64("completion_tokens", resp.Usage.CompletionTokens).
+		Msg("openai call completed")
 
 	return openaiToResponse(resp), nil
 }
 
-func messagesToOpenAI(model, system string, msgs []types.Message) []openai.ChatCompletionMessageParamUnion {
+func messagesToOpenAI(supportsVision bool, system string, msgs []types.Message) []openai.ChatCompletionMessageParamUnion {
 	var out []openai.ChatCompletionMessageParamUnion
 
 	if system != "" {
 		out = append(out, openai.SystemMessage(system))
 	}
-
-	supportsVision := !strings.Contains(model, "minimax")
 
 	for _, msg := range msgs {
 		switch msg.Role {

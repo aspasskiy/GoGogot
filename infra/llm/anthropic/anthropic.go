@@ -3,13 +3,13 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"time"
 
 	"gogogot/infra/llm/types"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/rs/zerolog/log"
 )
 
 type Backend struct {
@@ -49,22 +49,27 @@ func (b *Backend) Call(
 		params.Tools = anthTools
 	}
 
+	log.Debug().
+		Str("model", model).
+		Int("messages", len(anthMsgs)).
+		Msg("anthropic call start")
+
 	start := time.Now()
 	msg, err := b.client.Messages.New(ctx, params)
 	elapsed := time.Since(start)
 
 	if err != nil {
-		slog.Error("anthropic call failed", "error", err, "elapsed", elapsed)
+		log.Error().Err(err).Dur("elapsed", elapsed).Msg("anthropic call failed")
 		return nil, err
 	}
 
-	slog.Info("anthropic call completed",
-		"elapsed", elapsed,
-		"input_tokens", msg.Usage.InputTokens,
-		"output_tokens", msg.Usage.OutputTokens,
-		"stop_reason", msg.StopReason,
-		"content_blocks", len(msg.Content),
-	)
+	log.Info().
+		Dur("elapsed", elapsed).
+		Int64("input_tokens", msg.Usage.InputTokens).
+		Int64("output_tokens", msg.Usage.OutputTokens).
+		Str("stop_reason", string(msg.StopReason)).
+		Int("content_blocks", len(msg.Content)).
+		Msg("anthropic call completed")
 
 	return anthropicToResponse(msg), nil
 }

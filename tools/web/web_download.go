@@ -4,14 +4,16 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"gogogot/tools"
 	"strings"
 	"time"
+
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -56,7 +58,7 @@ func webDownload(ctx context.Context, input map[string]any) tools.Result {
 		dest = filepath.Join("/tmp", dest)
 	}
 
-	slog.Debug("web_download", "url", rawURL, "dest", dest)
+	log.Debug().Str("url", rawURL).Str("dest", dest).Msg("web_download")
 
 	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
 	defer cancel()
@@ -97,8 +99,7 @@ func webDownload(ctx context.Context, input map[string]any) tools.Result {
 	elapsed := time.Since(start)
 	ct := resp.Header.Get("Content-Type")
 
-	slog.Debug("web_download done", "url", rawURL, "dest", dest,
-		"bytes", written, "content_type", ct, "elapsed", elapsed)
+	log.Debug().Str("url", rawURL).Str("dest", dest).Int64("bytes", written).Str("content_type", ct).Dur("elapsed", elapsed).Msg("web_download done")
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "Downloaded to %s\n", dest)

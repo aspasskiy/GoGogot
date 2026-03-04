@@ -3,11 +3,13 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
-	"gogogot/tools"
 	"strings"
+
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 const maxFileSize = 50 * 1024
@@ -64,7 +66,7 @@ func readFile(_ context.Context, input map[string]any) tools.Result {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		slog.Debug("read_file error", "path", path, "error", err)
+		log.Debug().Str("path", path).Err(err).Msg("read_file error")
 		return tools.Result{Output: fmt.Sprintf("read error: %v", err), IsErr: true}
 	}
 
@@ -72,7 +74,7 @@ func readFile(_ context.Context, input map[string]any) tools.Result {
 	if truncated {
 		data = data[:maxFileSize]
 	}
-	slog.Debug("read_file", "path", path, "size", len(data), "truncated", truncated)
+	log.Debug().Str("path", path).Int("size", len(data)).Bool("truncated", truncated).Msg("read_file")
 
 	if truncated {
 		return tools.Result{Output: string(data) + "\n... (file truncated)"}
@@ -89,15 +91,15 @@ func writeFile(_ context.Context, input map[string]any) tools.Result {
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		slog.Debug("write_file mkdir error", "dir", dir, "error", err)
+		log.Debug().Str("dir", dir).Err(err).Msg("write_file mkdir error")
 		return tools.Result{Output: fmt.Sprintf("mkdir error: %v", err), IsErr: true}
 	}
 
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		slog.Debug("write_file error", "path", path, "error", err)
+		log.Debug().Str("path", path).Err(err).Msg("write_file error")
 		return tools.Result{Output: fmt.Sprintf("write error: %v", err), IsErr: true}
 	}
-	slog.Debug("write_file", "path", path, "bytes", len(content))
+	log.Debug().Str("path", path).Int("bytes", len(content)).Msg("write_file")
 	return tools.Result{Output: fmt.Sprintf("wrote %d bytes to %s", len(content), path)}
 }
 
@@ -109,11 +111,11 @@ func listFiles(_ context.Context, input map[string]any) tools.Result {
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		slog.Debug("list_files error", "path", path, "error", err)
+		log.Debug().Str("path", path).Err(err).Msg("list_files error")
 		return tools.Result{Output: fmt.Sprintf("readdir error: %v", err), IsErr: true}
 	}
 
-	slog.Debug("list_files", "path", path, "entries", len(entries))
+	log.Debug().Str("path", path).Int("entries", len(entries)).Msg("list_files")
 
 	var b strings.Builder
 	for _, e := range entries {

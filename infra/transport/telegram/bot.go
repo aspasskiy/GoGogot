@@ -3,7 +3,6 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -12,6 +11,7 @@ import (
 	"gogogot/infra/transport"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/rs/zerolog/log"
 )
 
 type mediaGroupBuffer struct {
@@ -32,7 +32,7 @@ func New(token string, ownerID int64) (*Transport, error) {
 	if err != nil {
 		return nil, fmt.Errorf("telegram bot init: %w", err)
 	}
-	slog.Info("telegram bot authorized", "username", api.Self.UserName)
+	log.Info().Str("username", api.Self.UserName).Msg("telegram bot authorized")
 	return &Transport{
 		api:         api,
 		ownerID:     ownerID,
@@ -47,7 +47,7 @@ func (t *Transport) Run(ctx context.Context, handler transport.Handler) error {
 	u.Timeout = 30
 	updates := t.api.GetUpdatesChan(u)
 
-	slog.Info("telegram bot polling started", "owner_id", t.ownerID)
+	log.Info().Int64("owner_id", t.ownerID).Msg("telegram bot polling started")
 	for {
 		select {
 		case <-ctx.Done():
@@ -62,7 +62,7 @@ func (t *Transport) Run(ctx context.Context, handler transport.Handler) error {
 				continue
 			}
 			if update.Message.From.ID != t.ownerID {
-				slog.Debug("ignoring message from non-owner", "user_id", update.Message.From.ID)
+				log.Debug().Int64("user_id", update.Message.From.ID).Msg("ignoring message from non-owner")
 				continue
 			}
 

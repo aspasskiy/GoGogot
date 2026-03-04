@@ -1,107 +1,18 @@
 package logger
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/log"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 )
 
 var logFile *os.File
-
-type multiHandler struct {
-	handlers []slog.Handler
-}
-
-func (m *multiHandler) Enabled(ctx context.Context, level slog.Level) bool {
-	for _, h := range m.handlers {
-		if h.Enabled(ctx, level) {
-			return true
-		}
-	}
-	return false
-}
-
-func (m *multiHandler) Handle(ctx context.Context, r slog.Record) error {
-	for _, h := range m.handlers {
-		if h.Enabled(ctx, r.Level) {
-			_ = h.Handle(ctx, r)
-		}
-	}
-	return nil
-}
-
-func (m *multiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
-	hs := make([]slog.Handler, len(m.handlers))
-	for i, h := range m.handlers {
-		hs[i] = h.WithAttrs(attrs)
-	}
-	return &multiHandler{handlers: hs}
-}
-
-func (m *multiHandler) WithGroup(name string) slog.Handler {
-	hs := make([]slog.Handler, len(m.handlers))
-	for i, h := range m.handlers {
-		hs[i] = h.WithGroup(name)
-	}
-	return &multiHandler{handlers: hs}
-}
-
-func newConsoleHandler() slog.Handler {
-	styles := log.DefaultStyles()
-
-	styles.Timestamp = lipgloss.NewStyle().Faint(true)
-	styles.Prefix = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("212"))
-	styles.Message = lipgloss.NewStyle()
-	styles.Key = lipgloss.NewStyle().Faint(true)
-	styles.Separator = lipgloss.NewStyle().Faint(true)
-
-	styles.Levels[log.DebugLevel] = lipgloss.NewStyle().
-		SetString("DBG").
-		Bold(true).
-		MaxWidth(4).
-		Foreground(lipgloss.Color("63"))
-
-	styles.Levels[log.InfoLevel] = lipgloss.NewStyle().
-		SetString("INF").
-		Bold(true).
-		MaxWidth(4).
-		Foreground(lipgloss.Color("86"))
-
-	styles.Levels[log.WarnLevel] = lipgloss.NewStyle().
-		SetString("WRN").
-		Bold(true).
-		MaxWidth(4).
-		Foreground(lipgloss.Color("192"))
-
-	styles.Levels[log.ErrorLevel] = lipgloss.NewStyle().
-		SetString("ERR").
-		Bold(true).
-		MaxWidth(4).
-		Foreground(lipgloss.Color("204"))
-
-	styles.Levels[log.FatalLevel] = lipgloss.NewStyle().
-		SetString("FTL").
-		Bold(true).
-		MaxWidth(4).
-		Foreground(lipgloss.Color("134"))
-
-	l := log.NewWithOptions(os.Stderr, log.Options{
-		Level:           log.DebugLevel,
-		ReportTimestamp: true,
-		TimeFormat:      "15:04:05",
-		Prefix:          "gogogot",
-	})
-	l.SetStyles(styles)
-
-	return l
-}
 
 func Init(dataDir, logLevel string) error {
 	dir := filepath.Join(dataDir, "logs")
@@ -118,17 +29,42 @@ func Init(dataDir, logLevel string) error {
 		return fmt.Errorf("logger: open: %w", err)
 	}
 
+	console := zerolog.ConsoleWriter{
+		Out:        os.Stderr,
+		TimeFormat: "15:04:05",
+		FormatLevel: func(i interface{}) string {
+			lvl := strings.ToUpper(fmt.Sprint(i))
+			switch lvl {
+			case "DEBUG":
+				return "\033[1;34mDBG\033[0m"
+			case "INFO":
+				return "\033[1;36mINF\033[0m"
+			case "WARN":
+				return "\033[1;33mWRN\033[0m"
+			case "ERROR":
+				return "\033[1;31mERR\033[0m"
+			case "FATAL":
+				return "\033[1;35mFTL\033[0m"
+			default:
+				return lvl
+			}
+		},
+		FormatMessage: func(i interface{}) string {
+			return fmt.Sprintf("\033[1mgogogot\033[0m %s", i)
+		},
+	}
+
 	fileLevel := parseLevel(logLevel)
 
-	fileHandler := slog.NewTextHandler(logFile, &slog.HandlerOptions{
-		Level: fileLevel,
-	})
+	fileWriter := &levelWriter{w: logFile, level: fileLevel}
+	multi := io.MultiWriter(console, fileWriter)
 
-	slog.SetDefault(slog.New(&multiHandler{
-		handlers: []slog.Handler{fileHandler, newConsoleHandler()},
-	}))
+	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.TimeFieldFormat = time.RFC3339
 
-	slog.Info("logger initialized", "path", path, "file_level", fileLevel.String())
+	log.Logger = zerolog.New(multi).With().Timestamp().Logger()
+
+	log.Info().Str("path", path).Str("file_level", fileLevel.String()).Msg("logger initialized")
 	return nil
 }
 
@@ -139,15 +75,31 @@ func Close() {
 	}
 }
 
-func parseLevel(s string) slog.Level {
+type levelWriter struct {
+	w     io.Writer
+	level zerolog.Level
+}
+
+func (lw *levelWriter) Write(p []byte) (n int, err error) {
+	return lw.w.Write(p)
+}
+
+func (lw *levelWriter) WriteLevel(level zerolog.Level, p []byte) (n int, err error) {
+	if level < lw.level {
+		return len(p), nil
+	}
+	return lw.w.Write(p)
+}
+
+func parseLevel(s string) zerolog.Level {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "debug":
-		return slog.LevelDebug
+		return zerolog.DebugLevel
 	case "warn", "warning":
-		return slog.LevelWarn
+		return zerolog.WarnLevel
 	case "error":
-		return slog.LevelError
+		return zerolog.ErrorLevel
 	default:
-		return slog.LevelInfo
+		return zerolog.InfoLevel
 	}
 }

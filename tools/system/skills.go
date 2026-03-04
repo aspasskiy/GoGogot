@@ -3,12 +3,13 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"strings"
 
 	"gogogot/core/skills"
 	"gogogot/core/store"
 	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 func SkillTools() []tools.Tool {
@@ -129,10 +130,10 @@ func skillCreate(_ context.Context, input map[string]any) tools.Result {
 
 	path, err := skills.CreateSkill(store.SkillsDir(), name, desc, body)
 	if err != nil {
-		slog.Error("skill_create failed", "name", name, "error", err)
+		log.Error().Err(err).Str("name", name).Msg("skill_create failed")
 		return tools.Result{Output: "error creating skill: " + err.Error(), IsErr: true}
 	}
-	slog.Info("skill_create", "name", name, "path", path)
+	log.Info().Str("name", name).Str("path", path).Msg("skill_create")
 	return tools.Result{Output: fmt.Sprintf("skill %q created at %s — it will appear in your available_skills on future conversations", name, path)}
 }
 
@@ -149,7 +150,7 @@ func skillUpdate(_ context.Context, input map[string]any) tools.Result {
 	if err := skills.UpdateSkill(store.SkillsDir(), name, content); err != nil {
 		return tools.Result{Output: "error updating skill: " + err.Error(), IsErr: true}
 	}
-	slog.Info("skill_update", "name", name)
+	log.Info().Str("name", name).Msg("skill_update")
 	return tools.Result{Output: fmt.Sprintf("skill %q updated", name)}
 }
 
@@ -161,6 +162,6 @@ func skillDelete(_ context.Context, input map[string]any) tools.Result {
 	if err := skills.DeleteSkill(store.SkillsDir(), name); err != nil {
 		return tools.Result{Output: "error deleting skill: " + err.Error(), IsErr: true}
 	}
-	slog.Info("skill_delete", "name", name)
+	log.Info().Str("name", name).Msg("skill_delete")
 	return tools.Result{Output: fmt.Sprintf("skill %q deleted", name)}
 }

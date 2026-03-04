@@ -3,9 +3,11 @@ package system
 import (
 	"context"
 	"fmt"
-	"log/slog"
+
 	"gogogot/infra/llm/types"
 	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Registry struct {
@@ -16,7 +18,7 @@ func NewRegistry(tt []tools.Tool) *Registry {
 	r := &Registry{tt: make(map[string]tools.Tool, len(tt))}
 	for _, t := range tt {
 		r.tt[t.Name] = t
-		slog.Debug("tool registered", "name", t.Name)
+		log.Debug().Str("name", t.Name).Msg("tool registered")
 	}
 	return r
 }
@@ -24,7 +26,7 @@ func NewRegistry(tt []tools.Tool) *Registry {
 func (r *Registry) Execute(ctx context.Context, name string, input map[string]any) tools.Result {
 	t, ok := r.tt[name]
 	if !ok {
-		slog.Warn("tool dispatch: unknown tool", "name", name)
+		log.Warn().Str("name", name).Msg("tool dispatch: unknown tool")
 		return tools.Result{Output: fmt.Sprintf("unknown tool: %s", name), IsErr: true}
 	}
 	return t.Handler(ctx, input)
@@ -53,5 +55,5 @@ func (r *Registry) All() []tools.Tool {
 
 func (r *Registry) Register(t tools.Tool) {
 	r.tt[t.Name] = t
-	slog.Debug("tool registered", "name", t.Name)
+	log.Debug().Str("name", t.Name).Msg("tool registered")
 }

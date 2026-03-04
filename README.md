@@ -1,6 +1,6 @@
 ![GoGogot](https://octagon-lab.sfo3.cdn.digitaloceanspaces.com/gogogot.jpg)
 
-# GoGogot — Lightweight Self-Hosted AI Agent Written in Go
+# GoGogot — Lightweight OpenClaw Written in Go
 
 [![Go Version](https://img.shields.io/badge/go-1.25-00ADD8?logo=go&logoColor=white)](https://go.dev)
 [![License](https://img.shields.io/github/license/aspasskiy/GoGogot)](LICENSE)
@@ -10,13 +10,30 @@
 
 An open-source, self-hosted personal AI agent written in Go. Deploy on your own server as a single ~15 MB binary — it runs shell commands, edits files, browses the web, manages persistent memory, and schedules tasks. A lightweight alternative to OpenClaw (Claude Code) in ~4,500 lines of Go. No frameworks, no plugins, no magic.
 
-```
-You (Telegram) → GoGogot → bash, files, web, memory, scheduler → You
-```
-
 ## What is GoGogot?
 
-GoGogot is an open-source AI agent that lives on your server. It can execute shell commands, read and write files, search and browse the web, maintain persistent memory, and run scheduled tasks — all powered by Claude or MiniMax. The entire agent is a single Go binary under 15 MB that idles at ~10 MB RAM and deploys with one `docker compose up` command.
+GoGogot is a **lightweight, extensible, and secure** open-source AI agent that lives on your server. It can execute shell commands, read and write files, search and browse the web, maintain persistent memory, and run scheduled tasks. The entire agent is a single Go binary under 15 MB that idles at ~10 MB RAM and deploys with one `docker compose up` command.
+
+### Philosophy
+
+The core philosophy of GoGogot is built around being **lightweight, extensible, and secure**:
+
+- **Lightweight & Containerized**: A single Go binary running inside a Docker container. No heavy frameworks, no complex orchestration. Just a simple eval loop with good tools and smart prompts that consistently outperforms complex frameworks.
+- **Secure**: You are fully in control. API keys never leave your server, and the agent runs isolated in a container.
+- **Single Model & Cost-Efficiency**: Driven by a single LLM of your choice. You can easily switch to affordable Chinese models (like DeepSeek, Qwen, or MiniMax via OpenRouter) to save costs on routine tasks without sacrificing capability.
+- **Extensible**: Clean Go interfaces make it trivial to add new LLM providers, transports, or custom tools.
+
+## Use Cases
+
+| Use Case | Example Prompt |
+| --- | --- |
+| **Daily Digest** | Find top 5 AI news from today, summarize each in 2 sentences, send me every morning at 9:00 |
+| **Report Generation** | Download sales data from this URL, calculate totals by region, generate a PDF report |
+| **File Processing** | Take these 12 screenshots, merge them into a single PDF, and send the file back |
+| **Market Research** | Search the web for pricing of competitors X, Y, Z and make a comparison table |
+| **Server Monitoring** | Check disk and memory usage every hour, alert me in Telegram if anything exceeds 80% |
+| **Data Extraction** | Fetch this webpage, extract all email addresses and phone numbers into a CSV |
+| **Routine Automation** | Every Friday at 18:00, pull this week's git commits and send me a changelog summary |
 
 ## GoGogot vs OpenClaw (Claude Code) vs Nanobot
 
@@ -40,43 +57,92 @@ The bottleneck is always the LLM API call, not the agent runtime. GoGogot compil
 Everything is configured explicitly via environment variables passed at deploy time. API keys never leave your server — there is no cloud account, no SaaS dashboard, no telemetry, no phoning home.
 
 
-| Variable             | Purpose                                      |
-| -------------------- | -------------------------------------------- |
-| `ANTHROPIC_API_KEY`  | Claude (direct API)                          |
-| `OPENROUTER_API_KEY` | MiniMax and other models via OpenRouter      |
-| `GOGOGOT_MODEL`      | `claude` or `minimax` — you choose the model |
-| `TELEGRAM_BOT_TOKEN` | Your Telegram bot                            |
-| `TELEGRAM_OWNER_ID`  | Only this user can talk to the bot           |
-| `BRAVE_API_KEY`      | Web search (optional)                        |
+| Variable             | Purpose                                           |
+| -------------------- | ------------------------------------------------- |
+| `ANTHROPIC_API_KEY`  | Claude (direct API)                               |
+| `OPENROUTER_API_KEY` | DeepSeek, Gemini, MiniMax, Qwen, Llama via OpenRouter |
+| `GOGOGOT_MODEL`      | Model ID — see table below (default: first available) |
+| `TELEGRAM_BOT_TOKEN` | Your Telegram bot                                 |
+| `TELEGRAM_OWNER_ID`  | Only this user can talk to the bot                |
+| `BRAVE_API_KEY`      | Web search (optional)                             |
 
 
-## Cost: MiniMax vs Claude
+## Choosing a Model
 
-You pick the price/quality tradeoff. Both models work out of the box — switch with an env var or CLI flag: `--model=minimax`.
+Set the model via environment variable or CLI flag:
+
+```bash
+# Environment variable
+GOGOGOT_MODEL=deepseek
+
+# CLI flag (overrides env)
+./gogogot --model=gemini
+```
+
+If `GOGOGOT_MODEL` is not set, the first available provider is used.
+
+### Built-in Models
+
+| ID         | Model                | Provider   | Context | Vision | Notes                        |
+| ---------- | -------------------- | ---------- | ------- | ------ | ---------------------------- |
+| `claude`   | Claude Sonnet 4.6    | Anthropic  | 200K    | Yes    | Best reasoning, highest cost |
+| `deepseek` | DeepSeek V3-0324     | OpenRouter | 128K    | No     | Best cost/quality ratio      |
+| `gemini`   | Gemini 2.5 Pro       | OpenRouter | 1M      | Yes    | Largest context window       |
+| `minimax`  | MiniMax M2.5         | OpenRouter | 1M      | No     | Cheap, good for routines     |
+| `qwen`     | Qwen3 235B A22B      | OpenRouter | 128K    | No     | Strong multilingual          |
+| `llama`    | Llama 4 Maverick     | OpenRouter | 1M      | Yes    | Open-source, good all-around |
+
+### Adding Custom Models
+
+Models are defined in `models.json`. Defaults are compiled into the binary, but you can override them by placing your own `models.json` in the data directory (`~/.gogogot/models.json`):
+
+```json
+[
+  {
+    "id": "mythomax",
+    "label": "MythoMax 13B (OpenRouter)",
+    "model": "gryphe/mythomax-l2-13b",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 4096
+  }
+]
+```
+
+Copy an entry, change 3 fields, restart. No recompilation needed. The `api_key_env` field references the environment variable name — keys stay in `.env`, the config is safe to commit.
+
+## Cost
+
+You pick the price/quality tradeoff. All models work out of the box — switch with one env var.
 
 
 | Model                         | Input (per 1M tokens) | Output (per 1M tokens) |
 | ----------------------------- | --------------------- | ---------------------- |
+| Qwen3 235B A22B               | $0.14                 | $0.30                  |
+| Llama 4 Maverick              | $0.19                 | $0.81                  |
+| DeepSeek V3-0324              | Free / $0.28          | Free / $1.10           |
 | MiniMax M2.5 (via OpenRouter) | $0.30                 | $1.10                  |
-| Claude Opus 4.6               | $5.00                 | $25.00                 |
-| Claude Opus 4                 | $15.00                | $75.00                 |
+| Gemini 2.5 Pro                | $1.25                 | $10.00                 |
+| Claude Sonnet 4.6             | $5.00                 | $25.00                 |
 
 
 A typical agent session (~50K input, ~10K output):
 
 
-| Model           | Cost per session |
-| --------------- | ---------------- |
-| MiniMax         | ~$0.03           |
-| Claude Opus 4.6 | ~$0.50           |
-| Claude Opus 4   | ~$1.50           |
+| Model              | Cost per session |
+| ------------------ | ---------------- |
+| Qwen3 / DeepSeek   | ~$0.02           |
+| MiniMax            | ~$0.03           |
+| Gemini 2.5 Pro     | ~$0.16           |
+| Claude Sonnet 4.6  | ~$0.50           |
 
 
-For routine tasks — daily digests, file management, web lookups — MiniMax is more than enough. Switch to Claude for complex reasoning when you need it. One env var.
+For routine tasks — daily digests, file management, web lookups — DeepSeek or MiniMax are more than enough. Switch to Claude or Gemini for complex reasoning when you need it.
 
 ## Extensible by Design
 
-LLM providers and chat transports are clean Go interfaces. Adding a new one = implementing a few methods. No plugin system, no registry, no YAML config.
+LLM providers and chat transports are clean Go interfaces. Adding a new model = editing a JSON file. Adding a new transport = implementing a few methods. No plugin system, no registry, no framework.
 
 **LLM provider** — 3 methods:
 
@@ -88,7 +154,7 @@ type LLM interface {
 }
 ```
 
-Ships with: **Anthropic** (native SDK) and **OpenAI-compatible** (OpenRouter — MiniMax, etc.)
+Ships with: **Anthropic** (native SDK) and **OpenAI-compatible** (OpenRouter — DeepSeek, Gemini, MiniMax, Qwen, Llama, etc.). Models configured via `models.json` — add any OpenRouter model without recompilation.
 
 **Transport** — 3 methods:
 
@@ -112,7 +178,7 @@ Ships with: **Telegram**. Want Discord, Slack, or Matrix? Implement 3 methods an
 - **Memory** — persistent markdown files the agent reads and writes itself
 - **Scheduling** — cron-based self-scheduling, persisted across restarts
 - **Compaction** — automatic context compression when approaching token limits
-- **Multi-model** — Claude and MiniMax, manually chosen, not auto-routed
+- **Multi-model** — 6 built-in models (Claude, DeepSeek, Gemini, MiniMax, Qwen, Llama), add your own via `models.json`
 - **Observability** — structured event system (LLM calls, tool executions, errors)
 
 ## Architecture
@@ -166,6 +232,13 @@ The LLM decides everything — when to plan, when to ask the user, when to self-
 
 ## Installation & Quick Start
 
+### Prerequisites
+
+- Get a `TELEGRAM_BOT_TOKEN` by creating a new bot via [@BotFather](https://t.me/BotFather) on Telegram.
+- Find your `TELEGRAM_OWNER_ID` (your personal Telegram user ID) using a bot like [@userinfobot](https://t.me/userinfobot). **This is critical for security** — it ensures only you can communicate with your agent.
+
+### Docker Deployment
+
 ```bash
 git clone https://github.com/aspasskiy/GoGogot.git
 cd GoGogot
@@ -180,17 +253,15 @@ docker compose -f deploy/docker-compose.yml up -d
 
 The Docker image ships with a full Ubuntu environment: bash, git, Python, Node.js, ripgrep, sqlite, postgresql-client, and more.
 
-## Philosophy
+### Local Development
 
-From the [orchestration spec](ORCHESTRATION_SPEC.md):
+To run the agent locally without Docker (requires Go 1.25+):
 
-> **Simplicity** — one loop, good tools, smart prompt. Complexity is added only when metrics prove it helps.
+```bash
+go run cmd/main.go
+```
 
-> **LLM-first** — the LLM decides what to do, when to plan, when to critique its own work. The system executes, not orchestrates.
-
-The previous spec had 10 orchestration patterns and 10 recipes as Go code structures. They were removed because a simple loop with good tools and prompts consistently outperforms complex orchestration frameworks. The only structural pattern retained is the **eval loop** — because external verification (tests, linter) requires actual code to check results and retry.
-
-## Tech Stack
+## Minimum Dependencies
 
 - **Go 1.25** — compiled, concurrent, zero-dependency runtime
 - [anthropic-sdk-go](https://github.com/anthropics/anthropic-sdk-go) — native Claude API

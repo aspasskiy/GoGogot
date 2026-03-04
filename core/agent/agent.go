@@ -2,15 +2,16 @@ package agent
 
 import (
 	"fmt"
-	"log/slog"
 	"path/filepath"
-	"gogogot/tools/system"
 	"strings"
 	"time"
 
 	"gogogot/core/agent/orchestration"
-	"gogogot/infra/llm"
 	"gogogot/core/store"
+	"gogogot/infra/llm"
+	"gogogot/tools/system"
+
+	"github.com/rs/zerolog/log"
 )
 
 type AgentConfig struct {
@@ -67,7 +68,7 @@ func (a *Agent) emit(kind orchestration.EventKind, data any) {
 		Data:      data,
 	}:
 	default:
-		slog.Warn("agent event dropped — bus full", "kind", kind)
+		log.Warn().Any("kind", kind).Msg("agent event dropped — bus full")
 	}
 }
 

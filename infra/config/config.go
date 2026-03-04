@@ -11,8 +11,6 @@ type Config struct {
 	Transport       string // "telegram" (default), "tui", "http", "slack", ...
 	TelegramToken   string
 	TelegramOwnerID int64
-	AnthropicKey    string
-	OpenRouterKey   string
 	BraveAPIKey     string
 	DataDir         string
 	LogLevel        string
@@ -29,8 +27,6 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Transport:     transport,
 		TelegramToken: os.Getenv("TELEGRAM_BOT_TOKEN"),
-		AnthropicKey:  os.Getenv("ANTHROPIC_API_KEY"),
-		OpenRouterKey: os.Getenv("OPENROUTER_API_KEY"),
 		BraveAPIKey:   os.Getenv("BRAVE_API_KEY"),
 		DataDir:       os.Getenv("GOGOGOT_DATA_DIR"),
 		LogLevel:      os.Getenv("LOG_LEVEL"),
@@ -61,6 +57,3 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-func (c *Config) HasAnyProvider() bool {
-	return c.AnthropicKey != "" || c.OpenRouterKey != ""
-}

@@ -3,15 +3,16 @@ package bridge
 import (
 	"context"
 	"fmt"
-	"log/slog"
-	"gogogot/tools/system"
 	"sync"
 
 	"gogogot/core/agent"
 	"gogogot/core/agent/orchestration"
-	"gogogot/infra/llm"
 	"gogogot/core/store"
+	"gogogot/infra/llm"
 	"gogogot/infra/transport"
+	"gogogot/tools/system"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Bridge struct {
@@ -65,11 +66,11 @@ func (b *Bridge) handleMessage(ctx context.Context, msg transport.Message) {
 		return
 	}
 
-	slog.Info("bridge: incoming message",
-		"channel", channelID,
-		"text_len", len(msg.Text),
-		"attachments", len(msg.Attachments),
-	)
+	log.Info().
+		Str("channel", channelID).
+		Int("text_len", len(msg.Text)).
+		Int("attachments", len(msg.Attachments)).
+		Msg("bridge: incoming message")
 
 	go b.runAgent(ctx, channelID, msg)
 }
@@ -89,7 +90,7 @@ func (b *Bridge) runAgent(ctx context.Context, channelID string, msg transport.M
 
 	a, err := b.getOrCreateAgent(channelID)
 	if err != nil {
-		slog.Error("bridge: failed to get agent", "error", err)
+		log.Error().Err(err).Msg("bridge: failed to get agent")
 		_ = b.transport.SendText(ctx, channelID, "Error: "+err.Error())
 		return
 	}
@@ -114,7 +115,7 @@ func (b *Bridge) runAgent(ctx context.Context, channelID string, msg transport.M
 	go func() {
 		defer close(events)
 		if err := a.Run(agentCtx, msg.Text, attachments...); err != nil {
-			slog.Error("bridge: agent run failed", "error", err, "channel", channelID)
+			log.Error().Err(err).Str("channel", channelID).Msg("bridge: agent run failed")
 		}
 	}()
 
@@ -148,7 +149,7 @@ func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-c
 		case orchestration.EventToolStart:
 			name, _ := ev.Data.(map[string]any)["name"].(string)
 			toolsUsed = append(toolsUsed, name)
-			slog.Debug("bridge: tool running", "name", name, "channel", channelID)
+			log.Debug().Str("name", name).Str("channel", channelID).Msg("bridge: tool running")
 
 			if su, ok := b.transport.(transport.StatusUpdater); ok && statusID != "" {
 				_ = su.UpdateStatus(ctx, channelID, statusID, fmt.Sprintf("Running %s...", name))
@@ -175,12 +176,12 @@ func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-c
 
 		case orchestration.EventDone:
 			cancelled := ctx.Err() != nil
-			slog.Info("bridge: agent done",
-				"channel", channelID,
-				"tools_used", toolsUsed,
-				"response_len", len(finalText),
-				"cancelled", cancelled,
-			)
+			log.Info().
+				Str("channel", channelID).
+				Strs("tools_used", toolsUsed).
+				Int("response_len", len(finalText)).
+				Bool("cancelled", cancelled).
+				Msg("bridge: agent done")
 			if su, ok := b.transport.(transport.StatusUpdater); ok && statusID != "" {
 				_ = su.DeleteStatus(context.Background(), channelID, statusID)
 			}

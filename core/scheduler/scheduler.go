@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"os"
 	"path/filepath"
 	"sync"
@@ -12,24 +11,22 @@ import (
 	"time"
 
 	"github.com/robfig/cron/v3"
+	"github.com/rs/zerolog/log"
 )
 
-// TaskExecutor runs a scheduled command in-process and returns the agent's
-// text output. The context carries a timeout; implementations must respect it.
 type TaskExecutor func(ctx context.Context, taskID, command string) (string, error)
 
-// backoffSchedule defines exponential delays indexed by consecutive error count.
 var backoffSchedule = []time.Duration{
-	30 * time.Second,  // 1st error
-	1 * time.Minute,   // 2nd error
-	5 * time.Minute,   // 3rd error
-	15 * time.Minute,  // 4th error
-	60 * time.Minute,  // 5th+ error
+	30 * time.Second,
+	1 * time.Minute,
+	5 * time.Minute,
+	15 * time.Minute,
+	60 * time.Minute,
 }
 
 const (
-	defaultTaskTimeout  = 5 * time.Minute
-	maxConcurrentTasks  = 2
+	defaultTaskTimeout = 5 * time.Minute
+	maxConcurrentTasks = 2
 )
 
 type TaskState struct {
@@ -89,10 +86,10 @@ func (s *Scheduler) SetExecutor(exec TaskExecutor) {
 
 func (s *Scheduler) Start() error {
 	if err := s.load(); err != nil && !os.IsNotExist(err) {
-		slog.Warn("failed to load schedules", "error", err)
+		log.Warn().Err(err).Msg("failed to load schedules")
 	}
 	s.cron.Start()
-	slog.Info("scheduler started", "tasks", len(s.tasks))
+	log.Info().Int("tasks", len(s.tasks)).Msg("scheduler started")
 	return nil
 }
 
@@ -171,14 +168,12 @@ func (s *Scheduler) makeRunner(id, command string) func() {
 			return
 		}
 
-		// Singleton guard: skip if already running.
 		if !task.running.CompareAndSwap(false, true) {
-			slog.Warn("scheduler: task already running, skipping", "id", id)
+			log.Warn().Str("id", id).Msg("scheduler: task already running, skipping")
 			return
 		}
 		defer task.running.Store(false)
 
-		// Exponential backoff: skip if too soon after consecutive errors.
 		if task.State.ConsecutiveErrors > 0 && !task.State.LastRunAt.IsZero() {
 			idx := task.State.ConsecutiveErrors - 1
 			if idx >= len(backoffSchedule) {
@@ -186,20 +181,19 @@ func (s *Scheduler) makeRunner(id, command string) func() {
 			}
 			cooldown := backoffSchedule[idx]
 			if time.Since(task.State.LastRunAt) < cooldown {
-				slog.Info("scheduler: backoff active, skipping",
-					"id", id,
-					"consecutive_errors", task.State.ConsecutiveErrors,
-					"cooldown", cooldown,
-				)
+				log.Info().
+					Str("id", id).
+					Int("consecutive_errors", task.State.ConsecutiveErrors).
+					Dur("cooldown", cooldown).
+					Msg("scheduler: backoff active, skipping")
 				return
 			}
 		}
 
-		// Acquire concurrency semaphore.
 		s.sem <- struct{}{}
 		defer func() { <-s.sem }()
 
-		slog.Info("scheduler firing task", "id", id, "command", command)
+		log.Info().Str("id", id).Str("command", command).Msg("scheduler firing task")
 		start := time.Now()
 
 		ctx, cancel := context.WithTimeout(context.Background(), defaultTaskTimeout)
@@ -217,20 +211,20 @@ func (s *Scheduler) makeRunner(id, command string) func() {
 			state.LastStatus = "error"
 			state.LastError = err.Error()
 			state.ConsecutiveErrors = task.State.ConsecutiveErrors + 1
-			slog.Error("scheduled task failed",
-				"id", id,
-				"error", err,
-				"consecutive_errors", state.ConsecutiveErrors,
-				"duration", elapsed,
-			)
+			log.Error().
+				Err(err).
+				Str("id", id).
+				Int("consecutive_errors", state.ConsecutiveErrors).
+				Dur("duration", elapsed).
+				Msg("scheduled task failed")
 		} else {
 			state.LastStatus = "ok"
 			state.ConsecutiveErrors = 0
-			slog.Info("scheduled task completed",
-				"id", id,
-				"output_len", len(output),
-				"duration", elapsed,
-			)
+			log.Info().
+				Str("id", id).
+				Int("output_len", len(output)).
+				Dur("duration", elapsed).
+				Msg("scheduled task completed")
 		}
 
 		s.mu.Lock()
@@ -256,14 +250,14 @@ func (s *Scheduler) load() error {
 	for _, t := range tasks {
 		entryID, err := s.cron.AddFunc(t.Schedule, s.makeRunner(t.ID, t.Command))
 		if err != nil {
-			slog.Error("failed to restore scheduled task", "id", t.ID, "schedule", t.Schedule, "error", err)
+			log.Error().Err(err).Str("id", t.ID).Str("schedule", t.Schedule).Msg("failed to restore scheduled task")
 			continue
 		}
 		t.entryID = entryID
 		s.tasks[t.ID] = t
 	}
 
-	slog.Info("loaded schedules from disk", "count", len(s.tasks))
+	log.Info().Int("count", len(s.tasks)).Msg("loaded schedules from disk")
 	return nil
 }
 

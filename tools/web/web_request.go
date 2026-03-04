@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"gogogot/tools"
 	"strings"
 	"time"
+
+	"gogogot/tools"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -59,7 +61,7 @@ func webRequest(ctx context.Context, input map[string]any) tools.Result {
 	body, _ := input["body"].(string)
 	headers, _ := input["headers"].(map[string]any)
 
-	slog.Debug("web_request", "method", method, "url", rawURL)
+	log.Debug().Str("method", method).Str("url", rawURL).Msg("web_request")
 
 	ctx, cancel := context.WithTimeout(ctx, requestTimeout)
 	defer cancel()
@@ -98,8 +100,7 @@ func webRequest(ctx context.Context, input map[string]any) tools.Result {
 	}
 
 	elapsed := time.Since(start)
-	slog.Debug("web_request done", "method", method, "url", rawURL,
-		"status", resp.StatusCode, "body_len", len(respBody), "elapsed", elapsed)
+	log.Debug().Str("method", method).Str("url", rawURL).Int("status", resp.StatusCode).Int("body_len", len(respBody)).Dur("elapsed", elapsed).Msg("web_request done")
 
 	var sb strings.Builder
 	fmt.Fprintf(&sb, "HTTP %d %s\n", resp.StatusCode, resp.Status)

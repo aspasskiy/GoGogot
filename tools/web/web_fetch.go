@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"net/http"
-	"gogogot/tools"
 	"strings"
 	"time"
 
+	"gogogot/tools"
+
 	"github.com/PuerkitoBio/goquery"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -52,7 +53,7 @@ func webFetch(ctx context.Context, input map[string]any) tools.Result {
 	}
 	selector, _ := input["selector"].(string)
 
-	slog.Debug("web_fetch", "url", rawURL, "selector", selector)
+	log.Debug().Str("url", rawURL).Str("selector", selector).Msg("web_fetch")
 
 	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
 	defer cancel()
@@ -66,7 +67,7 @@ func webFetch(ctx context.Context, input map[string]any) tools.Result {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		slog.Debug("web_fetch http error", "url", rawURL, "error", err)
+		log.Debug().Str("url", rawURL).Err(err).Msg("web_fetch http error")
 		return tools.Result{Output: fmt.Sprintf("http error: %v", err), IsErr: true}
 	}
 	defer resp.Body.Close()
