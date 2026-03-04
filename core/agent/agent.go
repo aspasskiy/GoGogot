@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/core/agent/orchestration"
+	"gogogot/core/prompt"
 	"gogogot/core/store"
 	"gogogot/infra/llm"
 	"gogogot/tools/system"
@@ -15,52 +15,52 @@ import (
 )
 
 type AgentConfig struct {
-	PromptCtx      PromptContext
+	PromptCtx      prompt.PromptContext
 	Model          string
 	MaxTokens      int
 	Tools          []string
-	Compaction     orchestration.CompactionConfig
+	Compaction     CompactionConfig
 	EvalIterations int
 }
 
 type Agent struct {
 	client      llm.LLM
 	Chat        *store.Chat
-	Events      chan orchestration.Event
+	Events      chan Event
 	config      AgentConfig
-	session     *orchestration.Session
+	session     *Session
 	registry    *system.Registry
-	beforeHooks []orchestration.BeforeToolCallFunc
-	afterHooks  []orchestration.AfterToolCallFunc
+	beforeHooks []BeforeToolCallFunc
+	afterHooks  []AfterToolCallFunc
 }
 
 func New(client llm.LLM, chat *store.Chat, config AgentConfig, registry *system.Registry) *Agent {
 	a := &Agent{
 		client:   client,
 		Chat:     chat,
-		Events:   make(chan orchestration.Event, 64),
+		Events:   make(chan Event, 64),
 		config:   config,
-		session:  orchestration.NewSession(chat.ID, ""),
+		session:  NewSession(chat.ID, ""),
 		registry: registry,
 	}
 
-	ld := orchestration.NewLoopDetector(0)
+	ld := NewLoopDetector(0)
 	a.AddBeforeHook(ld.BeforeHook())
 
 	return a
 }
 
-func (a *Agent) AddBeforeHook(fn orchestration.BeforeToolCallFunc) {
+func (a *Agent) AddBeforeHook(fn BeforeToolCallFunc) {
 	a.beforeHooks = append(a.beforeHooks, fn)
 }
 
-func (a *Agent) AddAfterHook(fn orchestration.AfterToolCallFunc) {
+func (a *Agent) AddAfterHook(fn AfterToolCallFunc) {
 	a.afterHooks = append(a.afterHooks, fn)
 }
 
-func (a *Agent) emit(kind orchestration.EventKind, data any) {
+func (a *Agent) emit(kind EventKind, data any) {
 	select {
-	case a.Events <- orchestration.Event{
+	case a.Events <- Event{
 		Timestamp: time.Now(),
 		Kind:      kind,
 		Source:    "core-loop",
@@ -78,7 +78,7 @@ func (a *Agent) ModelLabel() string {
 
 func (a *Agent) SetChat(chat *store.Chat) {
 	a.Chat = chat
-	a.session = orchestration.NewSession(chat.ID, "")
+	a.session = NewSession(chat.ID, "")
 }
 
 func uniqueName(name string, counts map[string]int) string {

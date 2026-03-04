@@ -1,4 +1,4 @@
-package orchestration
+package agent
 
 import (
 	"gogogot/infra/llm/types"

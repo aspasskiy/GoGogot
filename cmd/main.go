@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"gogogot/core/agent"
-	"gogogot/core/agent/orchestration"
+	"gogogot/core/prompt"
 	"gogogot/core/scheduler"
 	"gogogot/core/store"
 	"gogogot/infra/config"
@@ -68,7 +68,7 @@ func main() {
 
 	client := llm.NewClient(*provider, reg.Definitions())
 	agentCfg := agent.AgentConfig{
-		PromptCtx: agent.PromptContext{
+		PromptCtx: prompt.PromptContext{
 			TransportName: t.Name(),
 			ModelLabel:    provider.Label,
 		},
@@ -114,7 +114,7 @@ func buildTaskExecutor(
 		}
 
 		a := agent.New(client, chat, agentCfg, reg)
-		a.Events = make(chan orchestration.Event, 64)
+		a.Events = make(chan agent.Event, 64)
 		events := a.Events
 
 		var runErr error
@@ -127,7 +127,7 @@ func buildTaskExecutor(
 
 		var finalText string
 		for ev := range events {
-			if ev.Kind == orchestration.EventLLMStream {
+			if ev.Kind == agent.EventLLMStream {
 				if text, ok := ev.Data.(map[string]any)["text"].(string); ok {
 					finalText = text
 				}

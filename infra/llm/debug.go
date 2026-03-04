@@ -42,19 +42,15 @@ func logCallDone(model string, resp *types.Response, elapsed time.Duration) {
 		Int("output_tokens", resp.OutputTokens).
 		Str("stop_reason", resp.StopReason)
 
-	preview := truncate(textContent(resp.Content), 150)
-	if preview != "" {
-		evt.Str("response_preview", preview)
+	text := textContent(resp.Content)
+	if text != "" {
+		evt.Str("response_text", text)
 	}
 
-	var toolNames []string
 	for _, b := range resp.Content {
 		if b.Type == "tool_use" {
-			toolNames = append(toolNames, b.ToolName)
+			evt.Str("tool_call_"+b.ToolName, string(b.ToolInput))
 		}
-	}
-	if len(toolNames) > 0 {
-		evt.Strs("tool_calls", toolNames)
 	}
 
 	evt.Msg("llm call done")

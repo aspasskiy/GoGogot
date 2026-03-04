@@ -27,23 +27,19 @@ func (t *Transport) handleCallback(ctx context.Context, cb *tgbotapi.CallbackQue
 	chatID := cb.Message.Chat.ID
 	channelID := fmt.Sprintf("tg_%d", chatID)
 
-	chat, err := store.LoadChat(sofieID)
-	if err != nil {
-		answer := tgbotapi.NewCallback(cb.ID, "Error: "+err.Error())
+	cmd := &transport.Command{
+		Name:   transport.CmdSwitchChat,
+		Args:   map[string]string{"chat_id": sofieID},
+		Result: &transport.CommandResult{},
+	}
+	handler(ctx, transport.Message{ChannelID: channelID, Command: cmd})
+	if cmd.Result.Error != nil {
+		answer := tgbotapi.NewCallback(cb.ID, "Error: "+cmd.Result.Error.Error())
 		_, _ = t.api.Request(answer)
 		return
 	}
 
-	if err := store.SetExternalMapping(channelID, chat.ID); err != nil {
-		answer := tgbotapi.NewCallback(cb.ID, "Error: "+err.Error())
-		_, _ = t.api.Request(answer)
-		return
-	}
-
-	title := chat.Title
-	if title == "" {
-		title = "Untitled"
-	}
+	title := cmd.Result.Data["title"]
 
 	answer := tgbotapi.NewCallback(cb.ID, "Switched to: "+title)
 	_, _ = t.api.Request(answer)
@@ -148,13 +144,14 @@ func (t *Transport) convertAndDispatch(ctx context.Context, msgs []*tgbotapi.Mes
 		Msg("telegram incoming message")
 
 	if strings.HasPrefix(text, "/") {
-		cmd := strings.Fields(text)[0]
-		if cmd == "/stop" {
-			handler(ctx, transport.Message{ChannelID: channelID, Text: "/stop"})
+		cmdName := strings.Fields(text)[0]
+		if cmdName == "/stop" {
+			cmd := &transport.Command{Name: transport.CmdStop, Result: &transport.CommandResult{}}
+			handler(ctx, transport.Message{ChannelID: channelID, Command: cmd})
 			return
 		}
 		log.Info().Str("cmd", text).Msg("command received")
-		t.handleCommand(ctx, chatID, channelID, text)
+		t.handleCommand(ctx, chatID, channelID, text, handler)
 		return
 	}
 
@@ -165,21 +162,19 @@ func (t *Transport) convertAndDispatch(ctx context.Context, msgs []*tgbotapi.Mes
 	})
 }
 
-func (t *Transport) handleCommand(_ context.Context, chatID int64, channelID, text string) {
+func (t *Transport) handleCommand(ctx context.Context, chatID int64, channelID, text string, handler transport.Handler) {
 	parts := strings.Fields(text)
-	cmd := parts[0]
+	cmdText := parts[0]
 
-	switch cmd {
-	case "/start":
-		newChat := store.NewChat()
-		if err := newChat.Save(); err != nil {
-			t.send(chatID, "Error creating new chat: "+escapeMarkdown(err.Error()))
+	switch cmdText {
+	case "/start", "/new":
+		cmd := &transport.Command{Name: transport.CmdNewChat, Result: &transport.CommandResult{}}
+		handler(ctx, transport.Message{ChannelID: channelID, Command: cmd})
+		if cmd.Result.Error != nil {
+			t.send(chatID, "Error: "+escapeMarkdown(cmd.Result.Error.Error()))
 			return
 		}
-		if err := store.SetExternalMapping(channelID, newChat.ID); err != nil {
-			t.send(chatID, "Error: "+escapeMarkdown(err.Error()))
-			return
-		}
+		t.send(chatID, "✨ New chat started\\.")
 
 	case "/help":
 		t.send(chatID, "*Commands:*\n"+
@@ -188,18 +183,6 @@ func (t *Transport) handleCommand(_ context.Context, chatID int64, channelID, te
 			"/memory — list memory files\n"+
 			"/stop — cancel the current task\n"+
 			"/help — show this help")
-
-	case "/new":
-		newChat := store.NewChat()
-		if err := newChat.Save(); err != nil {
-			t.send(chatID, "Error creating new chat: "+escapeMarkdown(err.Error()))
-			return
-		}
-		if err := store.SetExternalMapping(channelID, newChat.ID); err != nil {
-			t.send(chatID, "Error: "+escapeMarkdown(err.Error()))
-			return
-		}
-		t.send(chatID, "✨ New chat started\\.")
 
 	case "/chats":
 		chats, err := store.ListChats()

@@ -2,10 +2,28 @@ package transport
 
 import "context"
 
+const (
+	CmdNewChat    = "new_chat"
+	CmdSwitchChat = "switch_chat"
+	CmdStop       = "stop"
+)
+
+type Command struct {
+	Name   string
+	Args   map[string]string
+	Result *CommandResult
+}
+
+type CommandResult struct {
+	Data  map[string]string
+	Error error
+}
+
 type Message struct {
 	ChannelID   string
 	Text        string
 	Attachments []Attachment
+	Command     *Command
 }
 
 type Attachment struct {

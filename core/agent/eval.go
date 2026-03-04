@@ -3,11 +3,20 @@ package agent
 import (
 	"context"
 	"fmt"
-
-	"gogogot/core/agent/orchestration"
 )
 
-func (a *Agent) RunWithEval(ctx context.Context, task string, eval orchestration.Evaluator) error {
+type EvalResult struct {
+	Passed   bool
+	Score    float64
+	Feedback string
+	Details  map[string]any
+}
+
+type Evaluator interface {
+	Evaluate(ctx context.Context) EvalResult
+}
+
+func (a *Agent) RunWithEval(ctx context.Context, task string, eval Evaluator) error {
 	maxIters := a.config.EvalIterations
 	if maxIters <= 0 {
 		maxIters = 1
@@ -23,9 +32,9 @@ func (a *Agent) RunWithEval(ctx context.Context, task string, eval orchestration
 			break
 		}
 
-		a.emit(orchestration.EventEvalRun, map[string]any{"iteration": iter})
+		a.emit(EventEvalRun, map[string]any{"iteration": iter})
 		result := eval.Evaluate(ctx)
-		a.emit(orchestration.EventEvalResult, map[string]any{
+		a.emit(EventEvalResult, map[string]any{
 			"iteration": iter,
 			"passed":    result.Passed,
 			"feedback":  result.Feedback,

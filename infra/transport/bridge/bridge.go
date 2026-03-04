@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"gogogot/core/agent"
-	"gogogot/core/agent/orchestration"
 	"gogogot/core/store"
 	"gogogot/infra/llm"
 	"gogogot/infra/transport"
@@ -46,12 +45,12 @@ func (b *Bridge) Transport() transport.Transport {
 }
 
 func (b *Bridge) handleMessage(ctx context.Context, msg transport.Message) {
-	channelID := msg.ChannelID
-
-	if msg.Text == "/stop" {
-		b.stopAgent(ctx, channelID)
+	if msg.Command != nil {
+		b.handleCommand(ctx, msg)
 		return
 	}
+
+	channelID := msg.ChannelID
 
 	b.mu.Lock()
 	_, busy := b.cancels[channelID]
@@ -73,6 +72,22 @@ func (b *Bridge) handleMessage(ctx context.Context, msg transport.Message) {
 		Msg("bridge: incoming message")
 
 	go b.runAgent(ctx, channelID, msg)
+}
+
+func (b *Bridge) handleCommand(ctx context.Context, msg transport.Message) {
+	cmd := msg.Command
+	switch cmd.Name {
+	case transport.CmdNewChat:
+		cmd.Result.Error = b.resetChat(msg.ChannelID)
+	case transport.CmdSwitchChat:
+		title, err := b.switchChat(msg.ChannelID, cmd.Args["chat_id"])
+		cmd.Result.Error = err
+		if err == nil {
+			cmd.Result.Data = map[string]string{"title": title}
+		}
+	case transport.CmdStop:
+		b.stopAgent(ctx, msg.ChannelID)
+	}
 }
 
 func (b *Bridge) runAgent(ctx context.Context, channelID string, msg transport.Message) {
@@ -109,7 +124,7 @@ func (b *Bridge) runAgent(ctx context.Context, channelID string, msg transport.M
 	attachments := make([]transport.Attachment, len(msg.Attachments))
 	copy(attachments, msg.Attachments)
 
-	a.Events = make(chan orchestration.Event, 64)
+	a.Events = make(chan agent.Event, 64)
 	events := a.Events
 
 	go func() {
@@ -136,17 +151,17 @@ func (b *Bridge) stopAgent(ctx context.Context, channelID string) {
 	_ = b.transport.SendText(ctx, channelID, "⏹ Stopping...")
 }
 
-func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-chan orchestration.Event, statusID string) {
+func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-chan agent.Event, statusID string) {
 	var finalText string
 	var toolsUsed []string
 
 	for ev := range events {
 		switch ev.Kind {
-		case orchestration.EventLLMStream:
+		case agent.EventLLMStream:
 			text, _ := ev.Data.(map[string]any)["text"].(string)
 			finalText = text
 
-		case orchestration.EventToolStart:
+		case agent.EventToolStart:
 			name, _ := ev.Data.(map[string]any)["name"].(string)
 			toolsUsed = append(toolsUsed, name)
 			log.Debug().Str("name", name).Str("channel", channelID).Msg("bridge: tool running")
@@ -158,7 +173,7 @@ func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-c
 				_ = tn.SendTyping(ctx, channelID)
 			}
 
-		case orchestration.EventError:
+		case agent.EventError:
 			if ctx.Err() != nil {
 				return
 			}
@@ -174,7 +189,7 @@ func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-c
 			}
 			return
 
-		case orchestration.EventDone:
+		case agent.EventDone:
 			cancelled := ctx.Err() != nil
 			log.Info().
 				Str("channel", channelID).
@@ -211,34 +226,34 @@ func (b *Bridge) getOrCreateAgent(channelID string) (*agent.Agent, error) {
 	return a, nil
 }
 
-func (b *Bridge) ResetChat(channelID string) (*agent.Agent, error) {
+func (b *Bridge) resetChat(channelID string) error {
 	b.mu.Lock()
 	delete(b.agents, channelID)
 	b.mu.Unlock()
 
 	newChat := store.NewChat()
 	if err := newChat.Save(); err != nil {
-		return nil, err
+		return err
 	}
 	if err := store.SetExternalMapping(channelID, newChat.ID); err != nil {
-		return nil, err
+		return err
 	}
 
 	a := agent.New(b.llmClient, newChat, b.agentCfg, b.registry)
 	b.mu.Lock()
 	b.agents[channelID] = a
 	b.mu.Unlock()
-	return a, nil
+	return nil
 }
 
-func (b *Bridge) SwitchChat(channelID, sofieID string) (*store.Chat, error) {
+func (b *Bridge) switchChat(channelID, sofieID string) (string, error) {
 	chat, err := store.LoadChat(sofieID)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
 	if err := store.SetExternalMapping(channelID, chat.ID); err != nil {
-		return nil, err
+		return "", err
 	}
 
 	a := agent.New(b.llmClient, chat, b.agentCfg, b.registry)
@@ -246,5 +261,9 @@ func (b *Bridge) SwitchChat(channelID, sofieID string) (*store.Chat, error) {
 	b.agents[channelID] = a
 	b.mu.Unlock()
 
-	return chat, nil
+	title := chat.Title
+	if title == "" {
+		title = "Untitled"
+	}
+	return title, nil
 }

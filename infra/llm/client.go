@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"time"
 
 	anthpkg "gogogot/infra/llm/anthropic"
 	oaipkg "gogogot/infra/llm/openai"
@@ -87,5 +88,11 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 
 	logCallStart(c.model, sys, messages, tools, c.provider.Format)
 
-	return c.backend.Call(ctx, c.model, sys, messages, tools, 4096)
+	start := time.Now()
+	resp, err := c.backend.Call(ctx, c.model, sys, messages, tools, 4096)
+	if err != nil {
+		return nil, err
+	}
+	logCallDone(c.model, resp, time.Since(start))
+	return resp, nil
 }

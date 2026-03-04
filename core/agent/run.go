@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/core/agent/orchestration"
+	"gogogot/core/prompt"
 	"gogogot/core/store"
 	"gogogot/infra/llm"
 	"gogogot/infra/llm/types"
@@ -35,7 +35,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			Int("total_tool_calls", total.ToolCalls).
 			Float64("total_cost_usd", total.Cost).
 			Msg("agent.Run done")
-		a.emit(orchestration.EventDone, map[string]any{
+		a.emit(EventDone, map[string]any{
 			"usage": total,
 		})
 	}()
@@ -83,7 +83,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		userBlocks = []types.ContentBlock{types.TextBlock(task)}
 	}
 
-	a.session.Append(orchestration.Message{
+	a.session.Append(Message{
 		Role:      "user",
 		Content:   userBlocks,
 		Timestamp: time.Now(),
@@ -109,7 +109,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			log.Error().Err(err).Msg("compaction failed")
 		}
 
-		a.emit(orchestration.EventLLMStart, nil)
+		a.emit(EventLLMStart, nil)
 
 		msgs := make([]types.Message, 0, len(a.session.Messages()))
 		for _, msg := range a.session.Messages() {
@@ -121,21 +121,21 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		}
 
 		resp, err := a.client.Call(ctx, msgs, llm.CallOptions{
-			System: SystemPrompt(a.config.PromptCtx),
+			System: prompt.SystemPrompt(a.config.PromptCtx),
 		})
 		if err != nil {
-			a.emit(orchestration.EventError, map[string]any{"error": err.Error()})
+			a.emit(EventError, map[string]any{"error": err.Error()})
 			return err
 		}
 
-		usage := orchestration.Usage{
+		usage := Usage{
 			InputTokens:  resp.InputTokens,
 			OutputTokens: resp.OutputTokens,
 			LLMCalls:     1,
-			Cost:         orchestration.CalcCost(a.client.ModelID(), resp.InputTokens, resp.OutputTokens),
+			Cost:         llm.CalcCost(a.client.ModelID(), resp.InputTokens, resp.OutputTokens),
 		}
 
-		a.emit(orchestration.EventLLMResponse, map[string]any{"usage": usage})
+		a.emit(EventLLMResponse, map[string]any{"usage": usage})
 
 		var assistantBlocks []types.ContentBlock
 		var toolCalls []types.ContentBlock
@@ -154,7 +154,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 
 		usage.ToolCalls = len(toolCalls)
 
-		a.session.Append(orchestration.Message{
+		a.session.Append(Message{
 			Role:      "assistant",
 			Content:   assistantBlocks,
 			Timestamp: time.Now(),
@@ -165,8 +165,8 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			a.Chat.Messages = append(a.Chat.Messages, store.Message{
 				Role: "assistant", Content: textContent,
 			})
-			log.Debug().Int("length", len(textContent)).Msg("agent text response")
-			a.emit(orchestration.EventLLMStream, map[string]any{"text": textContent})
+			log.Debug().Str("text", textContent).Msg("agent text response")
+			a.emit(EventLLMStream, map[string]any{"text": textContent})
 		}
 
 		if len(toolCalls) == 0 {
@@ -178,7 +178,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 		var toolResultBlocks []types.ContentBlock
 		for _, tc := range toolCalls {
 			log.Info().Str("name", tc.ToolName).Int("input_size", len(tc.ToolInput)).Msg("tool call")
-			a.emit(orchestration.EventToolStart, map[string]any{"name": tc.ToolName})
+			a.emit(EventToolStart, map[string]any{"name": tc.ToolName})
 
 			var input map[string]any
 			if len(tc.ToolInput) > 0 {
@@ -187,7 +187,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 				}
 			}
 
-			callCtx := &orchestration.ToolCallContext{
+			callCtx := &ToolCallContext{
 				ToolName:  tc.ToolName,
 				Args:      input,
 				ArgsRaw:   tc.ToolInput,
@@ -200,7 +200,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			for _, hook := range a.beforeHooks {
 				if err := hook(ctx, callCtx); err != nil {
 					log.Warn().Str("tool", tc.ToolName).Str("reason", err.Error()).Msg("before-hook blocked tool call")
-					a.emit(orchestration.EventLoopWarning, map[string]any{"name": tc.ToolName, "reason": err.Error()})
+					a.emit(EventLoopWarning, map[string]any{"name": tc.ToolName, "reason": err.Error()})
 					toolResultBlocks = append(toolResultBlocks, types.ToolResultBlock(
 						tc.ToolUseID, err.Error(), true,
 					))
@@ -216,7 +216,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			result := a.registry.Execute(ctx, tc.ToolName, input)
 			elapsed := time.Since(start)
 
-			callResult := &orchestration.ToolCallResult{
+			callResult := &ToolCallResult{
 				Output:   result.Output,
 				IsErr:    result.IsErr,
 				Duration: elapsed,
@@ -231,7 +231,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 				Int("output_size", len(result.Output)).
 				Dur("duration", elapsed).
 				Msg("tool result")
-			a.emit(orchestration.EventToolEnd, map[string]any{"name": tc.ToolName, "result": result.Output, "duration_ms": elapsed.Milliseconds()})
+			a.emit(EventToolEnd, map[string]any{"name": tc.ToolName, "result": result.Output, "duration_ms": elapsed.Milliseconds()})
 
 			toolResultBlocks = append(toolResultBlocks, types.ToolResultBlock(
 				tc.ToolUseID,
@@ -240,7 +240,7 @@ func (a *Agent) Run(ctx context.Context, task string, attachments ...transport.A
 			))
 		}
 
-		a.session.Append(orchestration.Message{
+		a.session.Append(Message{
 			Role:      "user",
 			Content:   toolResultBlocks,
 			Timestamp: time.Now(),

@@ -1,22 +1,22 @@
-package orchestration
+package agent
 
 import "time"
 
 type EventKind string
 
 const (
-	EventUserMessage   EventKind = "user_message"
-	EventLLMStart      EventKind = "llm_start"
-	EventLLMResponse   EventKind = "llm_response"
-	EventLLMStream     EventKind = "llm_stream"
-	EventToolStart     EventKind = "tool_start"
-	EventToolEnd       EventKind = "tool_end"
-	EventEvalRun       EventKind = "eval_run"
-	EventEvalResult    EventKind = "eval_result"
-	EventCompaction    EventKind = "compaction"
+	EventUserMessage EventKind = "user_message"
+	EventLLMStart    EventKind = "llm_start"
+	EventLLMResponse EventKind = "llm_response"
+	EventLLMStream   EventKind = "llm_stream"
+	EventToolStart   EventKind = "tool_start"
+	EventToolEnd     EventKind = "tool_end"
+	EventEvalRun     EventKind = "eval_run"
+	EventEvalResult  EventKind = "eval_result"
+	EventCompaction  EventKind = "compaction"
 	EventLoopWarning EventKind = "loop_warning"
 	EventError       EventKind = "error"
-	EventDone          EventKind = "done" // Added for completion signaling
+	EventDone        EventKind = "done"
 )
 
 type Event struct {

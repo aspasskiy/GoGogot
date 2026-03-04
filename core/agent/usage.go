@@ -1,8 +1,34 @@
-package orchestration
+package agent
 
 import (
+	"time"
+
 	"gogogot/infra/llm/types"
 )
+
+type Usage struct {
+	InputTokens      int
+	OutputTokens     int
+	CacheReadTokens  int
+	CacheWriteTokens int
+	TotalTokens      int
+	LLMCalls         int
+	ToolCalls        int
+	Cost             float64 // estimated USD
+	Duration         time.Duration
+}
+
+func (u *Usage) Add(other Usage) {
+	u.InputTokens += other.InputTokens
+	u.OutputTokens += other.OutputTokens
+	u.CacheReadTokens += other.CacheReadTokens
+	u.CacheWriteTokens += other.CacheWriteTokens
+	u.TotalTokens += other.TotalTokens
+	u.LLMCalls += other.LLMCalls
+	u.ToolCalls += other.ToolCalls
+	u.Cost += other.Cost
+	u.Duration += other.Duration
+}
 
 const charsPerToken = 4
 
@@ -28,7 +54,7 @@ func estimateBlocksChars(blocks []types.ContentBlock) int {
 		case "tool_result":
 			n += len(b.ToolOutput)
 		case "image":
-			n += 1000 // rough estimate for image tokens
+			n += 1000
 		}
 	}
 	return n
