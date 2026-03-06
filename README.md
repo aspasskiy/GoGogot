@@ -23,6 +23,45 @@ The core philosophy of GoGogot is built around being **lightweight, extensible, 
 - **Single Model & Cost-Efficiency**: Driven by a single LLM of your choice. You can easily switch to affordable Chinese models (like DeepSeek, Qwen, or MiniMax via OpenRouter) to save costs on routine tasks without sacrificing capability.
 - **Extensible**: Clean Go interfaces make it trivial to add new LLM providers, transports, or custom tools.
 
+### How It Works
+
+The entire agent is a `for` loop. No framework, no state machine, no orchestration layer — just call the LLM, execute any tool calls it returns, feed the results back, and repeat until the model has nothing left to do.
+
+Here is a simplified version of the actual [`Run`](agent/run.go) method with logging and bookkeeping stripped away:
+
+```go
+func (a *Agent) Run(ctx context.Context, input []ContentBlock) error {
+    a.messages = append(a.messages, userMessage(input))
+
+    for {
+        resp, err := a.llm.Call(ctx, a.messages, a.tools)
+        if err != nil {
+            return err
+        }
+        a.messages = append(a.messages, resp)
+
+        if len(resp.ToolCalls) == 0 {
+            break // model is done — send text to user
+        }
+
+        results := a.executeTools(resp.ToolCalls)
+        a.messages = append(a.messages, results)
+    }
+    return nil
+}
+```
+
+```mermaid
+flowchart LR
+    A[User Message] --> B[LLM]
+    B --> C{Tool Calls?}
+    C -- Yes --> D[Execute Tools]
+    D --> B
+    C -- No --> E[Send Reply]
+```
+
+That's it. Everything else — memory, scheduling, compaction, identity — is just tools the LLM can call inside this loop.
+
 ## Use Cases
 
 
