@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -41,12 +41,12 @@ func WebDownloadTool() tools.Tool {
 }
 
 func webDownload(ctx context.Context, input map[string]any) tools.Result {
-	rawURL, _ := input["url"].(string)
-	if rawURL == "" {
-		return tools.Result{Output: "url is required", IsErr: true}
+	rawURL, err := tools.GetString(input, "url")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
-	dest, _ := input["path"].(string)
+	dest := tools.GetStringOpt(input, "path")
 	if dest == "" {
 		parsed, err := url.Parse(rawURL)
 		if err == nil {

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -47,18 +47,18 @@ func WebRequestTool() tools.Tool {
 }
 
 func webRequest(ctx context.Context, input map[string]any) tools.Result {
-	rawURL, _ := input["url"].(string)
-	if rawURL == "" {
-		return tools.Result{Output: "url is required", IsErr: true}
+	rawURL, err := tools.GetString(input, "url")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
-	method, _ := input["method"].(string)
+	method := tools.GetStringOpt(input, "method")
 	if method == "" {
 		method = "GET"
 	}
 	method = strings.ToUpper(method)
 
-	body, _ := input["body"].(string)
+	body := tools.GetStringOpt(input, "body")
 	headers, _ := input["headers"].(map[string]any)
 
 	log.Debug().Str("method", method).Str("url", rawURL).Msg("web_request")

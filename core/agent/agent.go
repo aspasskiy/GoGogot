@@ -11,8 +11,8 @@ import (
 	"gogogot/core/store"
 	"gogogot/infra/llm"
 	"gogogot/infra/llm/types"
-	"gogogot/tools"
-	"gogogot/tools/system"
+	"gogogot/infra/tools"
+	"gogogot/infra/tools/system"
 
 	"github.com/rs/zerolog/log"
 )

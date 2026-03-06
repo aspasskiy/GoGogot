@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 )
 
 type taskStatus string
@@ -165,7 +165,10 @@ func TaskPlanTool(tp *TaskPlan) tools.Tool {
 		},
 		Required: []string{"action"},
 		Handler: func(_ context.Context, input map[string]any) tools.Result {
-			action, _ := input["action"].(string)
+			action, err := tools.GetString(input, "action")
+			if err != nil {
+				return tools.ErrResult(err)
+			}
 			switch action {
 			case "create":
 				raw, ok := input["tasks"].([]any)
@@ -184,18 +187,17 @@ func TaskPlanTool(tp *TaskPlan) tools.Tool {
 				return tp.create(entries)
 
 			case "add":
-				title, _ := input["title"].(string)
+				title := tools.GetStringOpt(input, "title")
 				return tp.add(title)
 
 			case "update":
-				idF, _ := input["id"].(float64)
-				id := int(idF)
-				status, _ := input["status"].(string)
-				if id == 0 {
-					return tools.Result{Output: "'id' is required for update", IsErr: true}
+				id, err := tools.GetInt(input, "id")
+				if err != nil {
+					return tools.ErrResult(err)
 				}
-				if status == "" {
-					return tools.Result{Output: "'status' is required for update", IsErr: true}
+				status, err := tools.GetString(input, "status")
+				if err != nil {
+					return tools.ErrResult(err)
 				}
 				return tp.update(id, status)
 

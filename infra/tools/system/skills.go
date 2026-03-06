@@ -7,7 +7,7 @@ import (
 
 	"gogogot/core/skills"
 	"gogogot/core/store"
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -103,9 +103,9 @@ func skillList(_ context.Context, _ map[string]any) tools.Result {
 }
 
 func skillRead(_ context.Context, input map[string]any) tools.Result {
-	name, _ := input["name"].(string)
-	if name == "" {
-		return tools.Result{Output: "name parameter is required", IsErr: true}
+	name, err := tools.GetString(input, "name")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 	content, err := skills.ReadSkill(store.SkillsDir(), name)
 	if err != nil {
@@ -115,17 +115,17 @@ func skillRead(_ context.Context, input map[string]any) tools.Result {
 }
 
 func skillCreate(_ context.Context, input map[string]any) tools.Result {
-	name, _ := input["name"].(string)
-	desc, _ := input["description"].(string)
-	body, _ := input["body"].(string)
-	if name == "" {
-		return tools.Result{Output: "name parameter is required", IsErr: true}
+	name, err := tools.GetString(input, "name")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
-	if desc == "" {
-		return tools.Result{Output: "description parameter is required", IsErr: true}
+	desc, err := tools.GetString(input, "description")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
-	if body == "" {
-		return tools.Result{Output: "body parameter is required", IsErr: true}
+	body, err := tools.GetString(input, "body")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
 	path, err := skills.CreateSkill(store.SkillsDir(), name, desc, body)
@@ -138,13 +138,13 @@ func skillCreate(_ context.Context, input map[string]any) tools.Result {
 }
 
 func skillUpdate(_ context.Context, input map[string]any) tools.Result {
-	name, _ := input["name"].(string)
-	content, _ := input["content"].(string)
-	if name == "" {
-		return tools.Result{Output: "name parameter is required", IsErr: true}
+	name, err := tools.GetString(input, "name")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
-	if content == "" {
-		return tools.Result{Output: "content parameter is required", IsErr: true}
+	content, err := tools.GetString(input, "content")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
 	if err := skills.UpdateSkill(store.SkillsDir(), name, content); err != nil {
@@ -155,9 +155,9 @@ func skillUpdate(_ context.Context, input map[string]any) tools.Result {
 }
 
 func skillDelete(_ context.Context, input map[string]any) tools.Result {
-	name, _ := input["name"].(string)
-	if name == "" {
-		return tools.Result{Output: "name parameter is required", IsErr: true}
+	name, err := tools.GetString(input, "name")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 	if err := skills.DeleteSkill(store.SkillsDir(), name); err != nil {
 		return tools.Result{Output: "error deleting skill: " + err.Error(), IsErr: true}

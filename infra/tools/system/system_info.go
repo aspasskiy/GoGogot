@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"gogogot/tools"
+	"gogogot/infra/tools"
 	"strings"
 	"time"
 )

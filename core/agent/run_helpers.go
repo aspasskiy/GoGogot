@@ -37,19 +37,13 @@ func (a *Agent) logRunDone(runStart time.Time) {
 
 func (a *Agent) appendUserMessage(userBlocks []types.ContentBlock) {
 	a.session.Append(Message{
-		Role:      "user",
+		Role:      string(types.RoleUser),
 		Content:   userBlocks,
 		Timestamp: time.Now(),
 	})
 
-	var taskText string
-	for _, b := range userBlocks {
-		if b.Type == "text" {
-			taskText += b.Text
-		}
-	}
 	a.Chat.Messages = append(a.Chat.Messages, store.Message{
-		Role: "user", Content: taskText,
+		Role: string(types.RoleUser), Content: types.ExtractText(userBlocks),
 	})
 }
 
@@ -58,7 +52,7 @@ func (a *Agent) buildLLMMessages() []types.Message {
 	msgs := make([]types.Message, 0, len(sessionMsgs))
 	for _, msg := range sessionMsgs {
 		role := types.RoleUser
-		if msg.Role == "assistant" {
+		if msg.Role == string(types.RoleAssistant) {
 			role = types.RoleAssistant
 		}
 		msgs = append(msgs, types.Message{Role: role, Content: msg.Content})

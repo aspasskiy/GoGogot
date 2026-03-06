@@ -4,16 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
-	"gogogot/core/scheduler"
+	"gogogot/infra/scheduler"
 )
 
 func ScheduleTools(sched *scheduler.Scheduler) []tools.Tool {
 	return []tools.Tool{
 		{
 			Name:        "schedule_add",
-			Description: "Add or update a recurring scheduled task. The task runs in-process on the cron schedule — a fresh agent executes the command and sends the result to the owner. Persists across restarts. Use standard 5-field cron: min hour dom month dow.",
+			Description: "Add or update a recurring scheduled task. The task runs in the owner's active chat on the cron schedule, preserving full conversation context. Persists across restarts. Use standard 5-field cron: min hour dom month dow.",
 			Parameters: map[string]any{
 				"id": map[string]any{
 					"type":        "string",
@@ -37,13 +37,19 @@ func ScheduleTools(sched *scheduler.Scheduler) []tools.Tool {
 			if sched == nil {
 				return tools.Result{Output: "scheduler not available", IsErr: true}
 			}
-			id, _ := input["id"].(string)
-			schedule, _ := input["schedule"].(string)
-			command, _ := input["command"].(string)
-			label, _ := input["label"].(string)
-			if id == "" || schedule == "" || command == "" {
-				return tools.Result{Output: "id, schedule, and command are required", IsErr: true}
+			id, err := tools.GetString(input, "id")
+			if err != nil {
+				return tools.ErrResult(err)
 			}
+			schedule, err := tools.GetString(input, "schedule")
+			if err != nil {
+				return tools.ErrResult(err)
+			}
+			command, err := tools.GetString(input, "command")
+			if err != nil {
+				return tools.ErrResult(err)
+			}
+			label := tools.GetStringOpt(input, "label")
 			if err := sched.Add(id, schedule, command, label); err != nil {
 				return tools.Result{Output: fmt.Sprintf("failed to add schedule: %v", err), IsErr: true}
 			}
@@ -83,9 +89,9 @@ func ScheduleTools(sched *scheduler.Scheduler) []tools.Tool {
 			if sched == nil {
 				return tools.Result{Output: "scheduler not available", IsErr: true}
 			}
-			id, _ := input["id"].(string)
-			if id == "" {
-				return tools.Result{Output: "id is required", IsErr: true}
+			id, err := tools.GetString(input, "id")
+			if err != nil {
+				return tools.ErrResult(err)
 			}
 			if err := sched.Remove(id); err != nil {
 				return tools.Result{Output: fmt.Sprintf("failed to remove: %v", err), IsErr: true}

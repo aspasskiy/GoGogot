@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -43,9 +43,9 @@ func WebSearchTool(braveAPIKey string) tools.Tool {
 }
 
 func webSearch(ctx context.Context, input map[string]any, apiKey string) tools.Result {
-	query, _ := input["query"].(string)
-	if query == "" {
-		return tools.Result{Output: "query is required", IsErr: true}
+	query, err := tools.GetString(input, "query")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
 	if apiKey == "" {

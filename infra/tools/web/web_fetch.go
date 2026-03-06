@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/rs/zerolog/log"
@@ -47,11 +47,11 @@ func WebFetchTool() tools.Tool {
 }
 
 func webFetch(ctx context.Context, input map[string]any) tools.Result {
-	rawURL, _ := input["url"].(string)
-	if rawURL == "" {
-		return tools.Result{Output: "url is required", IsErr: true}
+	rawURL, err := tools.GetString(input, "url")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
-	selector, _ := input["selector"].(string)
+	selector := tools.GetStringOpt(input, "selector")
 
 	log.Debug().Str("url", rawURL).Str("selector", selector).Msg("web_fetch")
 

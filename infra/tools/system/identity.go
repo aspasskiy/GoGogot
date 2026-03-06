@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"gogogot/core/store"
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -65,9 +65,9 @@ func soulRead(_ context.Context, _ map[string]any) tools.Result {
 }
 
 func soulWrite(_ context.Context, input map[string]any) tools.Result {
-	content, _ := input["content"].(string)
-	if content == "" {
-		return tools.Result{Output: "content parameter is required", IsErr: true}
+	content, err := tools.GetString(input, "content")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 	if err := store.WriteSoul(content); err != nil {
 		log.Error().Err(err).Msg("soul_write failed")
@@ -86,9 +86,9 @@ func userRead(_ context.Context, _ map[string]any) tools.Result {
 }
 
 func userWrite(_ context.Context, input map[string]any) tools.Result {
-	content, _ := input["content"].(string)
-	if content == "" {
-		return tools.Result{Output: "content parameter is required", IsErr: true}
+	content, err := tools.GetString(input, "content")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
 	oldTZ := store.LoadTimezone()

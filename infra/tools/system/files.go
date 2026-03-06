@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -59,9 +59,9 @@ func FileTools() []tools.Tool {
 }
 
 func readFile(_ context.Context, input map[string]any) tools.Result {
-	path, _ := input["path"].(string)
-	if path == "" {
-		return tools.Result{Output: "path is required", IsErr: true}
+	path, err := tools.GetString(input, "path")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
 	data, err := os.ReadFile(path)
@@ -83,11 +83,11 @@ func readFile(_ context.Context, input map[string]any) tools.Result {
 }
 
 func writeFile(_ context.Context, input map[string]any) tools.Result {
-	path, _ := input["path"].(string)
-	content, _ := input["content"].(string)
-	if path == "" {
-		return tools.Result{Output: "path is required", IsErr: true}
+	path, err := tools.GetString(input, "path")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
+	content := tools.GetStringOpt(input, "content")
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -104,7 +104,7 @@ func writeFile(_ context.Context, input map[string]any) tools.Result {
 }
 
 func listFiles(_ context.Context, input map[string]any) tools.Result {
-	path, _ := input["path"].(string)
+	path := tools.GetStringOpt(input, "path")
 	if path == "" {
 		path = "."
 	}

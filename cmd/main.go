@@ -9,17 +9,15 @@ import (
 	"syscall"
 
 	"gogogot/core/agent"
-	"gogogot/core/event"
 	"gogogot/core/prompt"
-	"gogogot/core/scheduler"
 	"gogogot/core/store"
 	"gogogot/infra/config"
 	"gogogot/infra/llm"
-	"gogogot/infra/llm/types"
 	"gogogot/infra/logger"
+	"gogogot/infra/scheduler"
 	"gogogot/infra/transport/bridge"
 	"gogogot/infra/transport/telegram"
-	"gogogot/tools/system"
+	"gogogot/infra/tools/system"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog/log"
@@ -78,16 +76,17 @@ func main() {
 		Compaction: agent.DefaultCompaction(),
 	}
 
-	executor := buildTaskExecutor(t, client, agentCfg, reg, ownerChannelID)
-	sched.SetExecutor(executor)
+	b := bridge.New(t, client, agentCfg, reg)
+
+	sched.SetExecutor(func(ctx context.Context, taskID, command string) (string, error) {
+		return b.RunScheduledTask(ctx, ownerChannelID, taskID, command)
+	})
 
 	if err := sched.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "error starting scheduler: %v\n", err)
 		os.Exit(1)
 	}
 	defer sched.Stop()
-
-	b := bridge.New(t, client, agentCfg, reg)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -97,59 +96,6 @@ func main() {
 		log.Error().Err(err).Msg("bridge run error")
 	}
 	fmt.Println("Shutting down.")
-}
-
-// buildTaskExecutor creates an in-process executor that runs a one-shot agent
-// for each scheduled task and sends the result to the owner via Telegram.
-func buildTaskExecutor(
-	t *telegram.Transport,
-	client llm.LLM,
-	agentCfg agent.AgentConfig,
-	reg *system.Registry,
-	ownerChannelID string,
-) scheduler.TaskExecutor {
-	return func(ctx context.Context, taskID, command string) (string, error) {
-		chat := store.NewChat()
-		chat.Title = fmt.Sprintf("cron:%s", taskID)
-		if err := chat.Save(); err != nil {
-			return "", fmt.Errorf("create chat: %w", err)
-		}
-
-		a := agent.New(client, chat, agentCfg, reg)
-		a.Events = make(chan event.Event, 64)
-		events := a.Events
-
-		var runErr error
-		done := make(chan struct{})
-		go func() {
-			defer close(done)
-			defer close(events)
-			runErr = a.Run(ctx, []types.ContentBlock{types.TextBlock(command)})
-		}()
-
-		var finalText string
-		for ev := range events {
-			if ev.Kind == event.LLMStream {
-				if text, ok := ev.Data.(map[string]any)["text"].(string); ok {
-					finalText = text
-				}
-			}
-		}
-		<-done
-
-		if runErr != nil {
-			return "", runErr
-		}
-
-		if finalText != "" {
-			prefix := fmt.Sprintf("⏰ [cron:%s]\n\n", taskID)
-			if err := t.SendText(ctx, ownerChannelID, prefix+finalText); err != nil {
-				log.Error().Err(err).Str("task", taskID).Msg("scheduler: failed to send result to owner")
-			}
-		}
-
-		return finalText, nil
-	}
 }
 
 func selectProvider(cfg *config.Config) (*llm.Provider, error) {

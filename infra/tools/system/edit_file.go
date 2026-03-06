@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -39,17 +39,16 @@ func EditFileTool() tools.Tool {
 }
 
 func editFile(_ context.Context, input map[string]any) tools.Result {
-	path, _ := input["path"].(string)
-	oldStr, _ := input["old_string"].(string)
-	newStr, _ := input["new_string"].(string)
-	replaceAll, _ := input["replace_all"].(bool)
-
-	if path == "" {
-		return tools.Result{Output: "path is required", IsErr: true}
+	path, err := tools.GetString(input, "path")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
-	if oldStr == "" {
-		return tools.Result{Output: "old_string is required", IsErr: true}
+	oldStr, err := tools.GetString(input, "old_string")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
+	newStr := tools.GetStringOpt(input, "new_string")
+	replaceAll := tools.GetBool(input, "replace_all")
 
 	data, err := os.ReadFile(path)
 	if err != nil {

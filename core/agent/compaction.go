@@ -67,7 +67,7 @@ func (s *Session) Compact(ctx context.Context, cfg CompactionConfig, summarize S
 
 	compacted := make([]Message, 0, 1+len(recent))
 	compacted = append(compacted, Message{
-		Role:      "user",
+		Role:      string(types.RoleUser),
 		Content:   []types.ContentBlock{types.TextBlock("[Context Summary]\n" + summary)},
 		Timestamp: time.Now(),
 		Metadata:  map[string]any{"compacted": true, "original_messages": len(old)},
@@ -120,13 +120,7 @@ func (a *Agent) summarize(ctx context.Context, prompt string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var text string
-	for _, block := range resp.Content {
-		if block.Type == "text" {
-			text += block.Text
-		}
-	}
-	return text, nil
+	return types.ExtractText(resp.Content), nil
 }
 
 func renderTranscript(msgs []Message) string {

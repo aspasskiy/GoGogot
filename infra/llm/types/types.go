@@ -57,6 +57,16 @@ func ToolResultBlock(id, output string, isErr bool) ContentBlock {
 	return ContentBlock{Type: "tool_result", ToolUseID: id, ToolOutput: output, ToolIsErr: isErr}
 }
 
+func ExtractText(blocks []ContentBlock) string {
+	var s string
+	for _, b := range blocks {
+		if b.Type == "text" {
+			s += b.Text
+		}
+	}
+	return s
+}
+
 func NewUserMessage(blocks ...ContentBlock) Message {
 	return Message{Role: RoleUser, Content: blocks}
 }

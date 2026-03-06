@@ -45,7 +45,7 @@ func (s *Session) Messages() []Message {
 func (s *Session) CompactAll(reason string) {
 	s.messages = []Message{
 		{
-			Role:      "assistant",
+			Role:      string(types.RoleAssistant),
 			Content:   []types.ContentBlock{types.TextBlock("Context compacted. Reason: " + reason)},
 			Timestamp: time.Now(),
 		},

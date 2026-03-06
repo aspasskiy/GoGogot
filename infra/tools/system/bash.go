@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -42,12 +42,12 @@ func BashTool() tools.Tool {
 }
 
 func executeBash(ctx context.Context, input map[string]any) tools.Result {
-	command, _ := input["command"].(string)
-	if command == "" {
-		return tools.Result{Output: "command is required", IsErr: true}
+	command, err := tools.GetString(input, "command")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 
-	workdir, _ := input["workdir"].(string)
+	workdir := tools.GetStringOpt(input, "workdir")
 
 	timeout := defaultBashTimeout
 	if v, ok := input["timeout"].(float64); ok && v > 0 {

@@ -28,20 +28,7 @@ func (t *Transport) sendAndGetID(chatID int64, markdownText string) int {
 }
 
 func (t *Transport) sendLong(chatID int64, text string) {
-	const maxLen = 4000
-	for len(text) > 0 {
-		chunk := text
-		if len(chunk) > maxLen {
-			cut := strings.LastIndex(chunk[:maxLen], "\n")
-			if cut < maxLen/2 {
-				cut = maxLen
-			}
-			chunk = text[:cut]
-			text = text[cut:]
-		} else {
-			text = ""
-		}
-
+	for _, chunk := range splitMessage(text) {
 		msg := tgbotapi.NewMessage(chatID, chunk)
 		msg.ParseMode = tgbotapi.ModeMarkdown
 		if _, err := t.api.Send(msg); err != nil {
@@ -81,20 +68,7 @@ func SendMessage(token string, chatID int64, text string) error {
 	if err != nil {
 		return fmt.Errorf("telegram init: %w", err)
 	}
-	const maxLen = 4000
-	for len(text) > 0 {
-		chunk := text
-		if len(chunk) > maxLen {
-			cut := strings.LastIndex(chunk[:maxLen], "\n")
-			if cut < maxLen/2 {
-				cut = maxLen
-			}
-			chunk = text[:cut]
-			text = text[cut:]
-		} else {
-			text = ""
-		}
-
+	for _, chunk := range splitMessage(text) {
 		msg := tgbotapi.NewMessage(chatID, chunk)
 		msg.ParseMode = tgbotapi.ModeMarkdown
 		if _, err := api.Send(msg); err != nil {
@@ -107,6 +81,27 @@ func SendMessage(token string, chatID int64, text string) error {
 	return nil
 }
 
+
+const maxMessageLen = 4000
+
+func splitMessage(text string) []string {
+	var chunks []string
+	for len(text) > 0 {
+		chunk := text
+		if len(chunk) > maxMessageLen {
+			cut := strings.LastIndex(chunk[:maxMessageLen], "\n")
+			if cut < maxMessageLen/2 {
+				cut = maxMessageLen
+			}
+			chunk = text[:cut]
+			text = text[cut:]
+		} else {
+			text = ""
+		}
+		chunks = append(chunks, chunk)
+	}
+	return chunks
+}
 
 func escapeMarkdown(s string) string {
 	replacer := strings.NewReplacer(

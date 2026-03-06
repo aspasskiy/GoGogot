@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"gogogot/core/store"
-	"gogogot/tools"
+	"gogogot/infra/tools"
 
 	"github.com/rs/zerolog/log"
 )
@@ -67,9 +67,9 @@ func memoryList(_ context.Context, _ map[string]any) tools.Result {
 }
 
 func memoryRead(_ context.Context, input map[string]any) tools.Result {
-	file, _ := input["file"].(string)
-	if file == "" {
-		return tools.Result{Output: "file parameter is required", IsErr: true}
+	file, err := tools.GetString(input, "file")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 	content, err := store.ReadMemory(file)
 	if err != nil {
@@ -80,13 +80,13 @@ func memoryRead(_ context.Context, input map[string]any) tools.Result {
 }
 
 func memoryWrite(_ context.Context, input map[string]any) tools.Result {
-	file, _ := input["file"].(string)
-	content, _ := input["content"].(string)
-	if file == "" {
-		return tools.Result{Output: "file parameter is required", IsErr: true}
+	file, err := tools.GetString(input, "file")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
-	if content == "" {
-		return tools.Result{Output: "content parameter is required", IsErr: true}
+	content, err := tools.GetString(input, "content")
+	if err != nil {
+		return tools.ErrResult(err)
 	}
 	if err := store.WriteMemory(file, content); err != nil {
 		log.Error().Err(err).Str("file", file).Msg("memory_write failed")

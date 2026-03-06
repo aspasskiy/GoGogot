@@ -3,7 +3,7 @@ package bridge
 import (
 	"context"
 
-	"gogogot/tools"
+	"gogogot/infra/tools"
 	"gogogot/infra/transport"
 )
 

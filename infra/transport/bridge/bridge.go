@@ -9,8 +9,9 @@ import (
 	"gogogot/core/event"
 	"gogogot/core/store"
 	"gogogot/infra/llm"
+	"gogogot/infra/llm/types"
 	"gogogot/infra/transport"
-	"gogogot/tools/system"
+	"gogogot/infra/tools/system"
 
 	"github.com/rs/zerolog/log"
 )
@@ -150,6 +151,70 @@ func (b *Bridge) stopAgent(ctx context.Context, channelID string) {
 
 	cancel()
 	_ = b.transport.SendText(ctx, channelID, "⏹ Stopping...")
+}
+
+// RunScheduledTask executes a scheduled task in the active chat for the given
+// channel. It runs synchronously and returns the agent's text output.
+// If the agent is already busy on this channel, it returns an error so the
+// scheduler can apply backoff and retry later.
+func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, command string) (string, error) {
+	b.mu.Lock()
+	_, busy := b.cancels[channelID]
+	b.mu.Unlock()
+	if busy {
+		return "", fmt.Errorf("agent busy on channel %s, will retry", channelID)
+	}
+
+	agentCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	b.mu.Lock()
+	b.cancels[channelID] = cancel
+	b.mu.Unlock()
+	defer func() {
+		b.mu.Lock()
+		delete(b.cancels, channelID)
+		b.mu.Unlock()
+	}()
+
+	a, err := b.getOrCreateAgent(channelID)
+	if err != nil {
+		return "", fmt.Errorf("get agent: %w", err)
+	}
+
+	prompt := fmt.Sprintf("[scheduled: %s] %s", taskID, command)
+	blocks := []types.ContentBlock{types.TextBlock(prompt)}
+
+	a.Events = make(chan event.Event, 64)
+	events := a.Events
+
+	var runErr error
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer close(events)
+		runErr = a.Run(agentCtx, blocks)
+	}()
+
+	var finalText string
+	for ev := range events {
+		if ev.Kind == event.LLMStream {
+			if text, ok := ev.Data.(map[string]any)["text"].(string); ok {
+				finalText = text
+			}
+		}
+	}
+	<-done
+
+	if runErr != nil {
+		return "", runErr
+	}
+
+	if finalText != "" {
+		_ = b.transport.SendText(ctx, channelID, finalText)
+	}
+
+	return finalText, nil
 }
 
 func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-chan event.Event, statusID string) {

@@ -51,7 +51,7 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 		usage.ToolCalls = len(parsed.toolCalls)
 
 		a.session.Append(Message{
-			Role:      "assistant",
+			Role:      string(types.RoleAssistant),
 			Content:   parsed.assistantBlocks,
 			Timestamp: time.Now(),
 			Usage:     &usage,
@@ -59,7 +59,7 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 
 		if parsed.textContent != "" {
 			a.Chat.Messages = append(a.Chat.Messages, store.Message{
-				Role: "assistant", Content: parsed.textContent,
+				Role: string(types.RoleAssistant), Content: parsed.textContent,
 			})
 			log.Debug().Str("text", parsed.textContent).Msg("agent text response")
 			a.emit(event.LLMStream, map[string]any{"text": parsed.textContent})
@@ -72,7 +72,7 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 
 		toolResults := a.executeToolCalls(ctx, parsed.toolCalls, &toolCallCounter)
 		a.session.Append(Message{
-			Role:      "user",
+			Role:      string(types.RoleUser),
 			Content:   toolResults,
 			Timestamp: time.Now(),
 		})
