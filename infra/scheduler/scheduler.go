@@ -14,7 +14,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type TaskExecutor func(ctx context.Context, taskID, command string) (string, error)
+type TaskExecutor func(ctx context.Context, taskID, command, skill string) (string, error)
 
 var backoffSchedule = []time.Duration{
 	30 * time.Second,
@@ -41,6 +41,7 @@ type Task struct {
 	ID        string    `json:"id"`
 	Schedule  string    `json:"schedule"`
 	Command   string    `json:"command"`
+	Skill     string    `json:"skill,omitempty"`
 	Label     string    `json:"label"`
 	CreatedAt time.Time `json:"created_at"`
 	State     TaskState `json:"state"`
@@ -53,6 +54,7 @@ type TaskInfo struct {
 	ID        string    `json:"id"`
 	Schedule  string    `json:"schedule"`
 	Command   string    `json:"command"`
+	Skill     string    `json:"skill,omitempty"`
 	Label     string    `json:"label"`
 	NextRun   time.Time `json:"next_run"`
 	CreatedAt time.Time `json:"created_at"`
@@ -97,7 +99,7 @@ func (s *Scheduler) SetLocation(loc *time.Location) {
 
 	s.cron = cron.New(cron.WithLocation(loc))
 	for _, t := range s.tasks {
-		entryID, err := s.cron.AddFunc(t.Schedule, s.makeRunner(t.ID, t.Command))
+		entryID, err := s.cron.AddFunc(t.Schedule, s.makeRunner(t.ID, t.Command, t.Skill))
 		if err != nil {
 			log.Error().Err(err).Str("id", t.ID).Msg("failed to re-add task after timezone change")
 			continue
@@ -122,7 +124,7 @@ func (s *Scheduler) Stop() {
 	<-ctx.Done()
 }
 
-func (s *Scheduler) Add(id, schedule, command, label string) error {
+func (s *Scheduler) Add(id, schedule, command, skill, label string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -130,7 +132,7 @@ func (s *Scheduler) Add(id, schedule, command, label string) error {
 		s.cron.Remove(existing.entryID)
 	}
 
-	entryID, err := s.cron.AddFunc(schedule, s.makeRunner(id, command))
+	entryID, err := s.cron.AddFunc(schedule, s.makeRunner(id, command, skill))
 	if err != nil {
 		return fmt.Errorf("invalid cron expression %q: %w", schedule, err)
 	}
@@ -139,6 +141,7 @@ func (s *Scheduler) Add(id, schedule, command, label string) error {
 		ID:        id,
 		Schedule:  schedule,
 		Command:   command,
+		Skill:     skill,
 		Label:     label,
 		CreatedAt: time.Now(),
 		entryID:   entryID,
@@ -171,6 +174,7 @@ func (s *Scheduler) List() []TaskInfo {
 			ID:        t.ID,
 			Schedule:  t.Schedule,
 			Command:   t.Command,
+			Skill:     t.Skill,
 			Label:     t.Label,
 			CreatedAt: t.CreatedAt,
 			State:     t.State,
@@ -183,7 +187,7 @@ func (s *Scheduler) List() []TaskInfo {
 	return out
 }
 
-func (s *Scheduler) makeRunner(id, command string) func() {
+func (s *Scheduler) makeRunner(id, command, skill string) func() {
 	return func() {
 		s.mu.Lock()
 		task, ok := s.tasks[id]
@@ -223,7 +227,7 @@ func (s *Scheduler) makeRunner(id, command string) func() {
 		ctx, cancel := context.WithTimeout(context.Background(), defaultTaskTimeout)
 		defer cancel()
 
-		output, err := s.executor(ctx, id, command)
+		output, err := s.executor(ctx, id, command, skill)
 
 		elapsed := time.Since(start)
 		state := TaskState{
@@ -272,7 +276,7 @@ func (s *Scheduler) load() error {
 	}
 
 	for _, t := range tasks {
-		entryID, err := s.cron.AddFunc(t.Schedule, s.makeRunner(t.ID, t.Command))
+		entryID, err := s.cron.AddFunc(t.Schedule, s.makeRunner(t.ID, t.Command, t.Skill))
 		if err != nil {
 			log.Error().Err(err).Str("id", t.ID).Str("schedule", t.Schedule).Msg("failed to restore scheduled task")
 			continue

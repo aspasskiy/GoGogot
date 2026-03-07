@@ -100,3 +100,4 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 	logCallDone(c.model, resp, time.Since(start))
 	return resp, nil
 }
+

@@ -79,8 +79,8 @@ func main() {
 
 	b := bridge.New(t, client, agentCfg, reg)
 
-	sched.SetExecutor(func(ctx context.Context, taskID, command string) (string, error) {
-		return b.RunScheduledTask(ctx, ownerChannelID, taskID, command)
+	sched.SetExecutor(func(ctx context.Context, taskID, command, skill string) (string, error) {
+		return b.RunScheduledTask(ctx, ownerChannelID, taskID, command, skill)
 	})
 
 	if err := sched.Start(); err != nil {

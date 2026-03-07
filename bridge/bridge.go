@@ -3,6 +3,7 @@ package bridge
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"gogogot/agent"
@@ -157,7 +158,7 @@ func (b *Bridge) stopAgent(ctx context.Context, channelID string) {
 // channel. It runs synchronously and returns the agent's text output.
 // If the agent is already busy on this channel, it returns an error so the
 // scheduler can apply backoff and retry later.
-func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, command string) (string, error) {
+func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, command, skill string) (string, error) {
 	b.mu.Lock()
 	_, busy := b.cancels[channelID]
 	b.mu.Unlock()
@@ -182,7 +183,7 @@ func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 		return "", fmt.Errorf("get agent: %w", err)
 	}
 
-	prompt := fmt.Sprintf("[scheduled: %s] %s", taskID, command)
+	prompt := buildScheduledPrompt(taskID, command, skill)
 	blocks := []types.ContentBlock{types.TextBlock(prompt)}
 
 	a.Events = make(chan event.Event, 64)
@@ -215,6 +216,18 @@ func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 	}
 
 	return finalText, nil
+}
+
+func buildScheduledPrompt(taskID, command, skill string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "[Scheduled Task: %s]\n", taskID)
+	b.WriteString("You woke up from a scheduled trigger. Execute the following instruction " +
+		"using your tools, memory, and skills. Do not write standalone scripts.\n\n")
+	fmt.Fprintf(&b, "Instruction: %s", command)
+	if skill != "" {
+		fmt.Fprintf(&b, "\nSkill: Read skill %q with skill_read and follow its instructions.", skill)
+	}
+	return b.String()
 }
 
 func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-chan event.Event, statusID string) {

@@ -146,16 +146,34 @@ You have full bash access but be mindful of the ephemeral environment.`
 
 func buildSchedulingSection() string {
 	return `SELF-SCHEDULING: You have a built-in scheduler for recurring tasks.
-Use the schedule_add, schedule_list, schedule_remove tools — NOT crontab.
-System cron will not survive container restarts — the built-in scheduler
-is persisted to /data and restores automatically.
+Use schedule_add, schedule_list, schedule_remove tools — NOT crontab or system cron.
+The built-in scheduler persists to /data and restores automatically across restarts.
 Cron schedules run in the owner's local timezone (from user.md).
-Example: schedule_add(id="morning-news", schedule="0 8 * * *", command="Send a morning news digest to the owner")
-When a task fires, a fresh agent runs the command in-process and sends the
-result directly to the owner. Each task has a 5-minute timeout.
-If a task fails repeatedly, it backs off exponentially (30s → 1m → 5m → 15m → 1h).
-Use schedule_list to check task state (last status, errors, next run).
-Always save a note about scheduled tasks in memory (scheduled-tasks.md).`
+
+HOW IT WORKS: When a scheduled task fires, YOU wake up — the same agent with
+full access to all your tools (bash, web_search, file operations, send_file),
+your memory, and your skills. The "command" field is a natural-language
+instruction for yourself — write it as you would a note to your future self.
+
+WRITING COMMANDS:
+- Good: "Check server status, summarize any issues, send a report to the owner"
+- Good: "Follow skill 'deploy-check' to verify all services are healthy"
+- Bad: writing a bash script that curls Telegram API or runs a local LLM
+- The command is NOT executed as a shell command — it is your instruction.
+
+USE SKILLS FOR COMPLEX TASKS: If a scheduled task involves multiple steps
+or a specific procedure, create a skill with skill_create first, then
+reference it in the command (or pass the skill name via the "skill" parameter).
+Example: schedule_add(id="morning-news", schedule="0 8 * * *",
+  command="Compile and send a morning news digest", skill="morning-report")
+This way you follow a consistent procedure every time instead of improvising.
+
+RULES:
+- NEVER write standalone scripts for scheduled tasks (no curl to APIs,
+  no local LLM inference, no cron-triggered shell scripts).
+- You ARE the executor — use your own tools when the task fires.
+- Each task has a 5-minute timeout. Failed tasks back off exponentially.
+- Use schedule_list to check state. Save notes in memory (scheduled-tasks.md).`
 }
 
 func buildDockerSection() string {

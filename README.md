@@ -20,7 +20,7 @@ The core philosophy of GoGogot is built around being **lightweight, extensible, 
 
 - **Lightweight & Containerized**: A single Go binary running inside a Docker container. No heavy frameworks, no complex orchestration. Just a simple eval loop with good tools and smart prompts that consistently outperforms complex frameworks.
 - **Secure**: You are fully in control. API keys never leave your server, and the agent runs isolated in a container.
-- **Single Model & Cost-Efficiency**: Driven by a single LLM of your choice. You can easily switch to affordable Chinese models (like DeepSeek, Qwen, or MiniMax via OpenRouter) to save costs on routine tasks without sacrificing capability.
+- **Single Model & Cost-Efficiency**: Driven by a single LLM of your choice. You can easily switch to affordable models (like DeepSeek V3.2, Qwen3.5, or MiniMax via OpenRouter) to save costs on routine tasks without sacrificing capability.
 - **Extensible**: Clean Go interfaces make it trivial to add new LLM providers, transports, or custom tools.
 
 ### How It Works
@@ -108,14 +108,15 @@ If `GOGOGOT_MODEL` is not set, the first available provider is used.
 ### Built-in Models
 
 
-| ID         | Model             | Provider   | Context | Vision | Notes                        |
-| ---------- | ----------------- | ---------- | ------- | ------ | ---------------------------- |
-| `claude`   | Claude Sonnet 4.6 | Anthropic  | 200K    | Yes    | Best reasoning, highest cost |
-| `deepseek` | DeepSeek V3-0324  | OpenRouter | 128K    | No     | Best cost/quality ratio      |
-| `gemini`   | Gemini 2.5 Pro    | OpenRouter | 1M      | Yes    | Largest context window       |
-| `minimax`  | MiniMax M2.5      | OpenRouter | 1M      | No     | Cheap, good for routines     |
-| `qwen`     | Qwen3 235B A22B   | OpenRouter | 128K    | No     | Strong multilingual          |
-| `llama`    | Llama 4 Maverick  | OpenRouter | 1M      | Yes    | Open-source, good all-around |
+| ID         | Model             | Provider   | Context | Vision | Arena Rank | Notes                        |
+| ---------- | ----------------- | ---------- | ------- | ------ | ---------- | ---------------------------- |
+| `claude`   | Claude Sonnet 4.6 | Anthropic  | 1M      | Yes    | #16        | Best coding, top-3 code rank |
+| `deepseek` | DeepSeek V3.2     | OpenRouter | 164K    | No     | #49        | Best cost/quality ratio      |
+| `gemini`   | Gemini 3 Pro      | OpenRouter | 1M      | Yes    | #5         | Top-5 overall, multimodal    |
+| `minimax`  | MiniMax M2.5      | OpenRouter | 1M      | No     | #75        | Cheap, good for routines     |
+| `qwen`     | Qwen3.5 397B A17B | OpenRouter | 262K    | Yes    | #22        | Strong multilingual, vision  |
+| `llama`    | Llama 4 Maverick  | OpenRouter | 1M      | Yes    | #160       | Open-source, free tier       |
+| `kimi`     | Kimi K2.5         | OpenRouter | 262K    | Yes    | #19        | Top-20 overall, multimodal   |
 
 
 ### Adding Custom Models
@@ -145,17 +146,18 @@ You pick the price/quality tradeoff. All models work out of the box — switch w
 
 | Model                         | Input (per 1M tokens) | Output (per 1M tokens) | ~Cost per session* |
 | ----------------------------- | --------------------- | ---------------------- | ------------------ |
-| Qwen3 235B A22B               | $0.14                 | $0.30                  | ~$0.02             |
-| Llama 4 Maverick              | $0.19                 | $0.81                  | ~$0.02             |
-| DeepSeek V3-0324              | Free / $0.28          | Free / $1.10           | ~$0.02             |
+| Llama 4 Maverick              | $0.15                 | $0.60                  | ~$0.01             |
+| DeepSeek V3.2                 | $0.25                 | $0.40                  | ~$0.02             |
 | MiniMax M2.5 (via OpenRouter) | $0.30                 | $1.10                  | ~$0.03             |
-| Gemini 2.5 Pro                | $1.25                 | $10.00                 | ~$0.16             |
-| Claude Sonnet 4.6             | $5.00                 | $25.00                 | ~$0.50             |
+| Qwen3.5 397B A17B             | $0.39                 | $2.34                  | ~$0.04             |
+| Kimi K2.5                     | $0.45                 | $2.20                  | ~$0.04             |
+| Gemini 3 Pro                  | $1.25                 | $10.00                 | ~$0.16             |
+| Claude Sonnet 4.6             | $3.00                 | $15.00                 | ~$0.30             |
 
 
  Typical session: ~50K input + ~10K output tokens.
 
-For routine tasks — daily digests, file management, web lookups — DeepSeek or MiniMax are more than enough. Switch to Claude or Gemini for complex reasoning when you need it.
+For routine tasks — daily digests, file management, web lookups — DeepSeek V3.2 or MiniMax are more than enough. Switch to Claude or Gemini 3 Pro for complex reasoning when you need it.
 
 ## Extensible by Design
 
@@ -225,7 +227,7 @@ Ships with: **Telegram**. Want Discord, Slack, or Matrix? Implement 3 methods an
 - **Task planning** — session-scoped checklist for multi-step work
 - **Scheduling** — cron-based self-scheduling, persisted across restarts
 - **Compaction** — automatic context compression when approaching token limits
-- **Multi-model** — 6 built-in models (Claude, DeepSeek, Gemini, MiniMax, Qwen, Llama), add your own via `models.json`
+- **Multi-model** — 7 built-in models (Claude Sonnet 4.6, DeepSeek V3.2, Gemini 3 Pro, MiniMax M2.5, Qwen3.5, Llama 4, Kimi K2.5), add your own via `models.json`
 - **Observability** — structured event system (LLM calls, tool executions, errors)
 
 ## Tools

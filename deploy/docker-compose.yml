@@ -8,4 +8,4 @@ services:
     volumes:
       - ./data:/data
       - ./work:/work
-    command: ["--model=minimax"]
+    command: ["--model=kimi"]

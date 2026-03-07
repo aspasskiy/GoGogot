@@ -5,22 +5,22 @@
     "model": "claude-sonnet-4-6",
     "api_key_env": "ANTHROPIC_API_KEY",
     "format": "anthropic",
-    "context_window": 200000,
+    "context_window": 1000000,
     "supports_vision": true
   },
   {
     "id": "deepseek",
-    "label": "DeepSeek V3-0324 (OpenRouter)",
-    "model": "deepseek/deepseek-chat-v3-0324:free",
+    "label": "DeepSeek V3.2 (OpenRouter)",
+    "model": "deepseek/deepseek-v3.2",
     "base_url": "https://openrouter.ai/api/v1",
     "api_key_env": "OPENROUTER_API_KEY",
     "format": "openai",
-    "context_window": 128000
+    "context_window": 163840
   },
   {
     "id": "gemini",
-    "label": "Gemini 2.5 Pro (OpenRouter)",
-    "model": "google/gemini-2.5-pro-preview-03-25",
+    "label": "Gemini 3 Pro (OpenRouter)",
+    "model": "google/gemini-3-pro-preview",
     "base_url": "https://openrouter.ai/api/v1",
     "api_key_env": "OPENROUTER_API_KEY",
     "format": "openai",
@@ -38,12 +38,13 @@
   },
   {
     "id": "qwen",
-    "label": "Qwen3 235B A22B (OpenRouter)",
-    "model": "qwen/qwen3-235b-a22b",
+    "label": "Qwen3.5 397B A17B (OpenRouter)",
+    "model": "qwen/qwen3.5-397b-a17b",
     "base_url": "https://openrouter.ai/api/v1",
     "api_key_env": "OPENROUTER_API_KEY",
     "format": "openai",
-    "context_window": 128000
+    "context_window": 262144,
+    "supports_vision": true
   },
   {
     "id": "llama",
@@ -53,6 +54,16 @@
     "api_key_env": "OPENROUTER_API_KEY",
     "format": "openai",
     "context_window": 1000000,
+    "supports_vision": true
+  },
+  {
+    "id": "kimi",
+    "label": "Kimi K2.5 (OpenRouter)",
+    "model": "moonshotai/kimi-k2.5",
+    "base_url": "https://openrouter.ai/api/v1",
+    "api_key_env": "OPENROUTER_API_KEY",
+    "format": "openai",
+    "context_window": 262144,
     "supports_vision": true
   }
 ]

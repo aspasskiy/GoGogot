@@ -13,7 +13,7 @@ func ScheduleTools(sched *scheduler.Scheduler) []tools.Tool {
 	return []tools.Tool{
 		{
 			Name:        "schedule_add",
-			Description: "Add or update a recurring scheduled task. The task runs in the owner's active chat on the cron schedule, preserving full conversation context. Persists across restarts. Use standard 5-field cron: min hour dom month dow.",
+			Description: "Add or update a recurring scheduled task. When the task fires, YOU wake up with full access to all your tools, memory, and skills to execute the command. Persists across restarts. Use standard 5-field cron: min hour dom month dow.",
 			Parameters: map[string]any{
 				"id": map[string]any{
 					"type":        "string",
@@ -25,7 +25,11 @@ func ScheduleTools(sched *scheduler.Scheduler) []tools.Tool {
 				},
 				"command": map[string]any{
 					"type":        "string",
-					"description": "Task description — what the agent should do when triggered",
+					"description": "Natural-language instruction for yourself (NOT a shell command). Describe what you should do when woken up. Example: 'Check server health and send a summary to the owner'",
+				},
+				"skill": map[string]any{
+					"type":        "string",
+					"description": "Optional skill name to follow when this task fires. The skill will be read with skill_read automatically. Use this for complex multi-step procedures.",
 				},
 				"label": map[string]any{
 					"type":        "string",
@@ -49,11 +53,16 @@ func ScheduleTools(sched *scheduler.Scheduler) []tools.Tool {
 			if err != nil {
 				return tools.ErrResult(err)
 			}
+			skill := tools.GetStringOpt(input, "skill")
 			label := tools.GetStringOpt(input, "label")
-			if err := sched.Add(id, schedule, command, label); err != nil {
+			if err := sched.Add(id, schedule, command, skill, label); err != nil {
 				return tools.Result{Output: fmt.Sprintf("failed to add schedule: %v", err), IsErr: true}
 			}
-			return tools.Result{Output: fmt.Sprintf("scheduled task %q with cron %q: %s", id, schedule, command)}
+			out := fmt.Sprintf("scheduled task %q with cron %q: %s", id, schedule, command)
+			if skill != "" {
+				out += fmt.Sprintf(" (skill: %s)", skill)
+			}
+			return tools.Result{Output: out}
 			},
 		},
 		{
