@@ -4,10 +4,13 @@ import (
 	"context"
 	"time"
 
+	"gogogot/core/agent/event"
+	"gogogot/core/agent/hook"
 	"gogogot/core/agent/prompt"
-	"gogogot/store"
+	"gogogot/core/agent/session"
 	"gogogot/llm"
 	"gogogot/llm/types"
+	"gogogot/store"
 
 	"github.com/rs/zerolog/log"
 )
@@ -34,22 +37,36 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 			log.Error().Err(err).Msg("compaction failed")
 		}
 
-		a.emit(EventLLMStart, nil)
+		msgs := a.buildLLMMessages()
+		sys := prompt.SystemPrompt(a.config.PromptCtx)
 
-		resp, err := a.client.Call(ctx, a.buildLLMMessages(), llm.CallOptions{
-			System:     prompt.SystemPrompt(a.config.PromptCtx),
+		llmCallCtx := &hook.LLMCallContext{
+			Model:    a.client.ModelID(),
+			System:   sys,
+			Messages: msgs,
+		}
+		a.emit(event.LLMStart, nil)
+		a.runBeforeLLMHooks(ctx, llmCallCtx)
+
+		callStart := time.Now()
+		resp, err := a.client.Call(ctx, msgs, llm.CallOptions{
+			System:     sys,
 			ExtraTools: a.localToolDefs(),
 		})
 		if err != nil {
-			a.emit(EventError, ErrorData{Error: err.Error()})
+			a.emit(event.Error, event.ErrorData{Error: err.Error()})
 			return err
 		}
+		a.runAfterLLMHooks(ctx, llmCallCtx, &hook.LLMCallResult{
+			Response: resp,
+			Duration: time.Since(callStart),
+		})
 
 		usage := a.trackUsage(resp)
 		parsed := parseResponseBlocks(resp.Content)
 		usage.ToolCalls = len(parsed.toolCalls)
 
-		a.session.Append(Message{
+		a.session.Append(session.Message{
 			Role:      string(types.RoleAssistant),
 			Content:   parsed.assistantBlocks,
 			Timestamp: time.Now(),
@@ -61,7 +78,7 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 				Role: string(types.RoleAssistant), Content: parsed.textContent,
 			})
 			log.Debug().Str("text", parsed.textContent).Msg("agent text response")
-			a.emit(EventLLMStream, LLMStreamData{Text: parsed.textContent})
+			a.emit(event.LLMStream, event.LLMStreamData{Text: parsed.textContent})
 		}
 
 		if len(parsed.toolCalls) == 0 {
@@ -70,7 +87,7 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 		}
 
 		toolResults := a.executeToolCalls(ctx, parsed.toolCalls, &toolCallCounter)
-		a.session.Append(Message{
+		a.session.Append(session.Message{
 			Role:      string(types.RoleUser),
 			Content:   toolResults,
 			Timestamp: time.Now(),

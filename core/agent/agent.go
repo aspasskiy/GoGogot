@@ -4,10 +4,13 @@ import (
 	"context"
 	"time"
 
+	"gogogot/core/agent/event"
+	"gogogot/core/agent/hook"
 	"gogogot/core/agent/prompt"
-	"gogogot/store"
+	"gogogot/core/agent/session"
 	"gogogot/llm"
 	"gogogot/llm/types"
+	"gogogot/store"
 	"gogogot/tools"
 	"gogogot/tools/system"
 
@@ -19,20 +22,22 @@ type AgentConfig struct {
 	Model          string
 	MaxTokens      int
 	Tools          []string
-	Compaction     CompactionConfig
+	Compaction     session.CompactionConfig
 	EvalIterations int
 }
 
 type Agent struct {
-	client      llm.LLM
-	Chat        *store.Chat
-	Events      chan Event
-	config      AgentConfig
-	session     *Session
-	registry    *tools.Registry
-	localTools  map[string]tools.Tool
-	beforeHooks []BeforeToolCallFunc
-	afterHooks  []AfterToolCallFunc
+	client         llm.LLM
+	Chat           *store.Chat
+	Events         chan event.Event
+	config         AgentConfig
+	session        *session.Session
+	registry       *tools.Registry
+	localTools     map[string]tools.Tool
+	beforeHooks    []hook.BeforeToolCallFunc
+	afterHooks     []hook.AfterToolCallFunc
+	beforeLLMHooks []hook.BeforeLLMCallFunc
+	afterLLMHooks  []hook.AfterLLMCallFunc
 }
 
 func New(client llm.LLM, chat *store.Chat, config AgentConfig, registry *tools.Registry) *Agent {
@@ -42,24 +47,25 @@ func New(client llm.LLM, chat *store.Chat, config AgentConfig, registry *tools.R
 	a := &Agent{
 		client:   client,
 		Chat:     chat,
-		Events:   make(chan Event, 64),
+		Events:   make(chan event.Event, 64),
 		config:   config,
-		session:  NewSession(chat.ID, ""),
+		session:  session.NewSession(chat.ID, ""),
 		registry: registry,
 		localTools: map[string]tools.Tool{
 			tpTool.Name: tpTool,
 		},
 	}
 
-	ld := NewLoopDetector(0)
+	ld := hook.NewLoopDetector(0)
 	a.AddBeforeHook(ld.BeforeHook())
-	a.AddBeforeHook(LoggingBeforeHook())
-	a.AddAfterHook(LoggingAfterHook())
+	a.AddBeforeHook(hook.LoggingBeforeHook())
+	a.AddAfterHook(hook.LoggingAfterHook())
+	a.AddBeforeLLMHook(hook.LLMLoggingBeforeHook())
+	a.AddAfterLLMHook(hook.LLMLoggingAfterHook())
 
 	return a
 }
 
-// localToolDefs returns LLM tool definitions for session-scoped tools.
 func (a *Agent) localToolDefs() []types.ToolDef {
 	defs := make([]types.ToolDef, 0, len(a.localTools))
 	for _, t := range a.localTools {
@@ -73,8 +79,6 @@ func (a *Agent) localToolDefs() []types.ToolDef {
 	return defs
 }
 
-// executeLocal tries to dispatch a tool call to a session-scoped tool.
-// Returns the result and true if handled, or zero value and false otherwise.
 func (a *Agent) executeLocal(ctx context.Context, name string, input map[string]any) (tools.Result, bool) {
 	t, ok := a.localTools[name]
 	if !ok {
@@ -83,17 +87,25 @@ func (a *Agent) executeLocal(ctx context.Context, name string, input map[string]
 	return t.Handler(ctx, input), true
 }
 
-func (a *Agent) AddBeforeHook(fn BeforeToolCallFunc) {
+func (a *Agent) AddBeforeHook(fn hook.BeforeToolCallFunc) {
 	a.beforeHooks = append(a.beforeHooks, fn)
 }
 
-func (a *Agent) AddAfterHook(fn AfterToolCallFunc) {
+func (a *Agent) AddAfterHook(fn hook.AfterToolCallFunc) {
 	a.afterHooks = append(a.afterHooks, fn)
 }
 
-func (a *Agent) emit(kind EventKind, data any) {
+func (a *Agent) AddBeforeLLMHook(fn hook.BeforeLLMCallFunc) {
+	a.beforeLLMHooks = append(a.beforeLLMHooks, fn)
+}
+
+func (a *Agent) AddAfterLLMHook(fn hook.AfterLLMCallFunc) {
+	a.afterLLMHooks = append(a.afterLLMHooks, fn)
+}
+
+func (a *Agent) emit(kind event.Kind, data any) {
 	select {
-	case a.Events <- Event{
+	case a.Events <- event.Event{
 		Timestamp: time.Now(),
 		Kind:      kind,
 		Source:    "core-loop",
@@ -111,5 +123,5 @@ func (a *Agent) ModelLabel() string {
 
 func (a *Agent) SetChat(chat *store.Chat) {
 	a.Chat = chat
-	a.session = NewSession(chat.ID, "")
+	a.session = session.NewSession(chat.ID, "")
 }

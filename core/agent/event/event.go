@@ -1,33 +1,37 @@
-package agent
+package event
 
-import "time"
+import (
+	"time"
 
-type EventKind string
+	"gogogot/core/agent/session"
+)
+
+type Kind string
 
 const (
-	EventLLMStart    EventKind = "llm_start"
-	EventLLMResponse EventKind = "llm_response"
-	EventLLMStream   EventKind = "llm_stream"
-	EventToolStart   EventKind = "tool_start"
-	EventToolEnd     EventKind = "tool_end"
-	EventEvalRun     EventKind = "eval_run"
-	EventEvalResult  EventKind = "eval_result"
-	EventCompaction  EventKind = "compaction"
-	EventLoopWarning EventKind = "loop_warning"
-	EventError       EventKind = "error"
-	EventDone        EventKind = "done"
+	LLMStart    Kind = "llm_start"
+	LLMResponse Kind = "llm_response"
+	LLMStream   Kind = "llm_stream"
+	ToolStart   Kind = "tool_start"
+	ToolEnd     Kind = "tool_end"
+	EvalRun     Kind = "eval_run"
+	EvalResult  Kind = "eval_result"
+	Compaction  Kind = "compaction"
+	LoopWarning Kind = "loop_warning"
+	Error       Kind = "error"
+	Done        Kind = "done"
 )
 
 type Event struct {
 	Timestamp time.Time
-	Kind      EventKind
+	Kind      Kind
 	Source    string
 	Depth     int
 	Data      any
 }
 
 type LLMResponseData struct {
-	Usage Usage
+	Usage session.Usage
 }
 
 type LLMStreamData struct {
@@ -50,7 +54,7 @@ type ErrorData struct {
 }
 
 type DoneData struct {
-	Usage Usage
+	Usage session.Usage
 }
 
 type CompactionData struct {

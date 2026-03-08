@@ -1,8 +1,9 @@
-package agent
+package session
 
 import (
-	"gogogot/llm/types"
 	"time"
+
+	"gogogot/llm/types"
 )
 
 type Message struct {

@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-	modelFlag := flag.String("model", "", "model ID from models.json (default: first available)")
+	modelFlag := flag.String("model", "", "model alias or OpenRouter slug (default: first available)")
 	flag.Parse()
 
 	cfg, err := config.Load()
@@ -94,22 +94,10 @@ func main() {
 }
 
 func selectProvider(cfg *config.Config) (*llm.Provider, error) {
-	providers, err := llm.LoadProviders(cfg.DataDir)
-	if err != nil {
-		return nil, err
-	}
-	if len(providers) == 0 {
-		return nil, fmt.Errorf("no LLM providers available — set ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
-	}
 	if cfg.Model == "" {
-		return &providers[0], nil
+		return llm.DefaultProvider()
 	}
-	for i := range providers {
-		if providers[i].ID == cfg.Model {
-			return &providers[i], nil
-		}
-	}
-	return nil, fmt.Errorf("unknown model %q", cfg.Model)
+	return llm.ResolveProvider(cfg.Model)
 }
 
 type storeAdapter struct{}

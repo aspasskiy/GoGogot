@@ -14,20 +14,20 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type Backend struct {
+type Adapter struct {
 	client         *openai.Client
 	supportsVision bool
 }
 
-func NewBackend(baseURL, apiKey string, supportsVision bool) *Backend {
+func NewAdapter(baseURL, apiKey string, supportsVision bool) *Adapter {
 	c := openai.NewClient(
 		oaioption.WithBaseURL(baseURL),
 		oaioption.WithAPIKey(apiKey),
 	)
-	return &Backend{client: &c, supportsVision: supportsVision}
+	return &Adapter{client: &c, supportsVision: supportsVision}
 }
 
-func (b *Backend) Call(
+func (a *Adapter) Call(
 	ctx context.Context,
 	model string,
 	systemPrompt string,
@@ -35,7 +35,7 @@ func (b *Backend) Call(
 	tools []types.ToolDef,
 	maxTokens int,
 ) (*types.Response, error) {
-	oaiMsgs := messagesToOpenAI(b.supportsVision, systemPrompt, messages)
+	oaiMsgs := messagesToOpenAI(a.supportsVision, systemPrompt, messages)
 	oaiTools := toolDefsToOpenAI(tools)
 
 	params := openai.ChatCompletionNewParams{
@@ -54,7 +54,7 @@ func (b *Backend) Call(
 
 	start := time.Now()
 
-	resp, err := b.client.Chat.Completions.New(ctx, params)
+	resp, err := a.client.Chat.Completions.New(ctx, params)
 	elapsed := time.Since(start)
 	if err != nil {
 		log.Error().Err(err).Dur("elapsed", elapsed).Msg("openai call failed")

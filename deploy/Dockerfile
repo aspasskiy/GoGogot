@@ -5,6 +5,7 @@ WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
+RUN curl -sf https://openrouter.ai/api/v1/models -o llm/openrouter/openrouter_models.json
 RUN CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /gogogot ./cmd
 
 # -----------------------------------------------------------

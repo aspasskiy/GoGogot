@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"time"
 
-	"gogogot/store"
-	"gogogot/llm"
+	"gogogot/core/agent/event"
+	"gogogot/core/agent/hook"
+	"gogogot/core/agent/session"
 	"gogogot/llm/types"
+	"gogogot/store"
 
 	"github.com/rs/zerolog/log"
 )
@@ -32,11 +34,11 @@ func (a *Agent) logRunDone(runStart time.Time) {
 		Int("total_tool_calls", total.ToolCalls).
 		Float64("total_cost_usd", total.Cost).
 		Msg("agent.Run done")
-	a.emit(EventDone, DoneData{Usage: total})
+	a.emit(event.Done, event.DoneData{Usage: total})
 }
 
 func (a *Agent) appendUserMessage(userBlocks []types.ContentBlock) {
-	a.session.Append(Message{
+	a.session.Append(session.Message{
 		Role:      string(types.RoleUser),
 		Content:   userBlocks,
 		Timestamp: time.Now(),
@@ -60,14 +62,14 @@ func (a *Agent) buildLLMMessages() []types.Message {
 	return msgs
 }
 
-func (a *Agent) trackUsage(resp *llm.Response) Usage {
-	usage := Usage{
+func (a *Agent) trackUsage(resp *types.Response) session.Usage {
+	usage := session.Usage{
 		InputTokens:  resp.InputTokens,
 		OutputTokens: resp.OutputTokens,
 		LLMCalls:     1,
-		Cost:         llm.CalcCost(a.client.ModelID(), resp.InputTokens, resp.OutputTokens),
+		Cost:         hook.CalcCost(a.client.InputPricePerM(), a.client.OutputPricePerM(), resp.InputTokens, resp.OutputTokens),
 	}
-	a.emit(EventLLMResponse, LLMResponseData{Usage: usage})
+	a.emit(event.LLMResponse, event.LLMResponseData{Usage: usage})
 	return usage
 }
 
@@ -103,12 +105,12 @@ func (a *Agent) executeSingleTool(ctx context.Context, tc types.ContentBlock, co
 		}
 	}
 
-	a.emit(EventToolStart, ToolStartData{
+	a.emit(event.ToolStart, event.ToolStartData{
 		Name:   tc.ToolName,
 		Detail: extractToolDetail(tc.ToolName, input),
 	})
 
-	callCtx := &ToolCallContext{
+	callCtx := &hook.ToolCallContext{
 		ToolName:  tc.ToolName,
 		Args:      input,
 		ArgsRaw:   tc.ToolInput,
@@ -118,7 +120,7 @@ func (a *Agent) executeSingleTool(ctx context.Context, tc types.ContentBlock, co
 	*counter++
 
 	if err := a.runBeforeHooks(ctx, callCtx); err != nil {
-		a.emit(EventLoopWarning, LoopWarningData{Name: tc.ToolName, Reason: err.Error()})
+		a.emit(event.LoopWarning, event.LoopWarningData{Name: tc.ToolName, Reason: err.Error()})
 		return types.ToolResultBlock(tc.ToolUseID, err.Error(), true)
 	}
 
@@ -129,31 +131,43 @@ func (a *Agent) executeSingleTool(ctx context.Context, tc types.ContentBlock, co
 	}
 	elapsed := time.Since(start)
 
-	a.runAfterHooks(ctx, callCtx, &ToolCallResult{
+	a.runAfterHooks(ctx, callCtx, &hook.ToolCallResult{
 		Output:   result.Output,
 		IsErr:    result.IsErr,
 		Duration: elapsed,
 	})
 
-	a.emit(EventToolEnd, ToolEndData{
+	a.emit(event.ToolEnd, event.ToolEndData{
 		Name: tc.ToolName, Result: result.Output, DurationMs: elapsed.Milliseconds(),
 	})
 
 	return types.ToolResultBlock(tc.ToolUseID, result.Output, result.IsErr)
 }
 
-func (a *Agent) runBeforeHooks(ctx context.Context, callCtx *ToolCallContext) error {
-	for _, hook := range a.beforeHooks {
-		if err := hook(ctx, callCtx); err != nil {
+func (a *Agent) runBeforeHooks(ctx context.Context, callCtx *hook.ToolCallContext) error {
+	for _, h := range a.beforeHooks {
+		if err := h(ctx, callCtx); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (a *Agent) runAfterHooks(ctx context.Context, callCtx *ToolCallContext, result *ToolCallResult) {
-	for _, hook := range a.afterHooks {
-		hook(ctx, callCtx, result)
+func (a *Agent) runAfterHooks(ctx context.Context, callCtx *hook.ToolCallContext, result *hook.ToolCallResult) {
+	for _, h := range a.afterHooks {
+		h(ctx, callCtx, result)
+	}
+}
+
+func (a *Agent) runBeforeLLMHooks(ctx context.Context, lc *hook.LLMCallContext) {
+	for _, h := range a.beforeLLMHooks {
+		h(ctx, lc)
+	}
+}
+
+func (a *Agent) runAfterLLMHooks(ctx context.Context, lc *hook.LLMCallContext, result *hook.LLMCallResult) {
+	for _, h := range a.afterLLMHooks {
+		h(ctx, lc, result)
 	}
 }
 

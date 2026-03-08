@@ -12,11 +12,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type Backend struct {
+type Adapter struct {
 	client *anthropic.Client
 }
 
-func NewBackend(apiKey, baseURL string) *Backend {
+func NewAdapter(apiKey, baseURL string) *Adapter {
 	var opts []option.RequestOption
 	if apiKey != "" {
 		opts = append(opts, option.WithAPIKey(apiKey))
@@ -25,10 +25,10 @@ func NewBackend(apiKey, baseURL string) *Backend {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
 	api := anthropic.NewClient(opts...)
-	return &Backend{client: &api}
+	return &Adapter{client: &api}
 }
 
-func (b *Backend) Call(
+func (a *Adapter) Call(
 	ctx context.Context,
 	model string,
 	systemPrompt string,
@@ -55,7 +55,7 @@ func (b *Backend) Call(
 		Msg("anthropic call start")
 
 	start := time.Now()
-	msg, err := b.client.Messages.New(ctx, params)
+	msg, err := a.client.Messages.New(ctx, params)
 	elapsed := time.Since(start)
 
 	if err != nil {

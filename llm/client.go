@@ -2,7 +2,6 @@ package llm
 
 import (
 	"context"
-	"time"
 
 	anthpkg "gogogot/llm/anthropic"
 	oaipkg "gogogot/llm/openai"
@@ -16,7 +15,7 @@ type (
 	ContentBlock = types.ContentBlock
 )
 
-type Backend interface {
+type Adapter interface {
 	Call(ctx context.Context, model string, systemPrompt string,
 		messages []types.Message, tools []types.ToolDef, maxTokens int,
 	) (*types.Response, error)
@@ -27,6 +26,8 @@ type LLM interface {
 	ModelID() string
 	ModelLabel() string
 	ContextWindow() int
+	InputPricePerM() float64
+	OutputPricePerM() float64
 }
 
 type CallOptions struct {
@@ -38,23 +39,23 @@ type CallOptions struct {
 }
 
 type Client struct {
-	backend  Backend
+	adapter  Adapter
 	model    string
 	tools    []ToolDef
 	provider Provider
 }
 
 func NewClient(p Provider, toolDefs []ToolDef) *Client {
-	var backend Backend
+	var adapter Adapter
 	switch p.Format {
 	case "openai":
-		backend = oaipkg.NewBackend(p.BaseURL, p.APIKey, p.SupportsVision)
+		adapter = oaipkg.NewAdapter(p.BaseURL, p.APIKey, p.SupportsVision)
 	default:
-		backend = anthpkg.NewBackend(p.APIKey, p.BaseURL)
+		adapter = anthpkg.NewAdapter(p.APIKey, p.BaseURL)
 	}
 
 	return &Client{
-		backend:  backend,
+		adapter:  adapter,
 		model:    p.Model,
 		tools:    toolDefs,
 		provider: p,
@@ -71,6 +72,14 @@ func (c *Client) ModelLabel() string {
 
 func (c *Client) ContextWindow() int {
 	return c.provider.ContextWindow
+}
+
+func (c *Client) InputPricePerM() float64 {
+	return c.provider.InputPricePerM
+}
+
+func (c *Client) OutputPricePerM() float64 {
+	return c.provider.OutputPricePerM
 }
 
 func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions) (*Response, error) {
@@ -90,15 +99,7 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 		}
 	}
 
-	logCallStart(c.model, sys, messages, tools, c.provider.Format)
-
-	start := time.Now()
-	resp, err := c.backend.Call(ctx, c.model, sys, messages, tools, 4096)
-	if err != nil {
-		return nil, err
-	}
-	logCallDone(c.model, resp, time.Since(start))
-	return resp, nil
+	return c.adapter.Call(ctx, c.model, sys, messages, tools, 4096)
 }
 
 
