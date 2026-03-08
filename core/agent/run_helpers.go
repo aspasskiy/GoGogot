@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"gogogot/event"
 	"gogogot/store"
 	"gogogot/llm"
 	"gogogot/llm/types"
@@ -33,7 +32,7 @@ func (a *Agent) logRunDone(runStart time.Time) {
 		Int("total_tool_calls", total.ToolCalls).
 		Float64("total_cost_usd", total.Cost).
 		Msg("agent.Run done")
-	a.emit(event.Done, map[string]any{"usage": total})
+	a.emit(EventDone, DoneData{Usage: total})
 }
 
 func (a *Agent) appendUserMessage(userBlocks []types.ContentBlock) {
@@ -68,7 +67,7 @@ func (a *Agent) trackUsage(resp *llm.Response) Usage {
 		LLMCalls:     1,
 		Cost:         llm.CalcCost(a.client.ModelID(), resp.InputTokens, resp.OutputTokens),
 	}
-	a.emit(event.LLMResponse, map[string]any{"usage": usage})
+	a.emit(EventLLMResponse, LLMResponseData{Usage: usage})
 	return usage
 }
 
@@ -104,9 +103,9 @@ func (a *Agent) executeSingleTool(ctx context.Context, tc types.ContentBlock, co
 		}
 	}
 
-	a.emit(event.ToolStart, map[string]any{
-		"name":   tc.ToolName,
-		"detail": extractToolDetail(tc.ToolName, input),
+	a.emit(EventToolStart, ToolStartData{
+		Name:   tc.ToolName,
+		Detail: extractToolDetail(tc.ToolName, input),
 	})
 
 	callCtx := &ToolCallContext{
@@ -119,7 +118,7 @@ func (a *Agent) executeSingleTool(ctx context.Context, tc types.ContentBlock, co
 	*counter++
 
 	if err := a.runBeforeHooks(ctx, callCtx); err != nil {
-		a.emit(event.LoopWarning, map[string]any{"name": tc.ToolName, "reason": err.Error()})
+		a.emit(EventLoopWarning, LoopWarningData{Name: tc.ToolName, Reason: err.Error()})
 		return types.ToolResultBlock(tc.ToolUseID, err.Error(), true)
 	}
 
@@ -136,8 +135,8 @@ func (a *Agent) executeSingleTool(ctx context.Context, tc types.ContentBlock, co
 		Duration: elapsed,
 	})
 
-	a.emit(event.ToolEnd, map[string]any{
-		"name": tc.ToolName, "result": result.Output, "duration_ms": elapsed.Milliseconds(),
+	a.emit(EventToolEnd, ToolEndData{
+		Name: tc.ToolName, Result: result.Output, DurationMs: elapsed.Milliseconds(),
 	})
 
 	return types.ToolResultBlock(tc.ToolUseID, result.Output, result.IsErr)

@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"gogogot/event"
-	"gogogot/agent/prompt"
+	"gogogot/core/agent/prompt"
 	"gogogot/store"
 	"gogogot/llm"
 	"gogogot/llm/types"
@@ -27,7 +26,7 @@ type AgentConfig struct {
 type Agent struct {
 	client      llm.LLM
 	Chat        *store.Chat
-	Events      chan event.Event
+	Events      chan Event
 	config      AgentConfig
 	session     *Session
 	registry    *tools.Registry
@@ -43,7 +42,7 @@ func New(client llm.LLM, chat *store.Chat, config AgentConfig, registry *tools.R
 	a := &Agent{
 		client:   client,
 		Chat:     chat,
-		Events:   make(chan event.Event, 64),
+		Events:   make(chan Event, 64),
 		config:   config,
 		session:  NewSession(chat.ID, ""),
 		registry: registry,
@@ -92,9 +91,9 @@ func (a *Agent) AddAfterHook(fn AfterToolCallFunc) {
 	a.afterHooks = append(a.afterHooks, fn)
 }
 
-func (a *Agent) emit(kind event.Kind, data any) {
+func (a *Agent) emit(kind EventKind, data any) {
 	select {
-	case a.Events <- event.Event{
+	case a.Events <- Event{
 		Timestamp: time.Now(),
 		Kind:      kind,
 		Source:    "core-loop",

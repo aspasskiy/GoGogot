@@ -4,8 +4,7 @@ import (
 	"context"
 	"time"
 
-	"gogogot/event"
-	"gogogot/agent/prompt"
+	"gogogot/core/agent/prompt"
 	"gogogot/store"
 	"gogogot/llm"
 	"gogogot/llm/types"
@@ -35,14 +34,14 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 			log.Error().Err(err).Msg("compaction failed")
 		}
 
-		a.emit(event.LLMStart, nil)
+		a.emit(EventLLMStart, nil)
 
 		resp, err := a.client.Call(ctx, a.buildLLMMessages(), llm.CallOptions{
 			System:     prompt.SystemPrompt(a.config.PromptCtx),
 			ExtraTools: a.localToolDefs(),
 		})
 		if err != nil {
-			a.emit(event.Error, map[string]any{"error": err.Error()})
+			a.emit(EventError, ErrorData{Error: err.Error()})
 			return err
 		}
 
@@ -62,7 +61,7 @@ func (a *Agent) Run(ctx context.Context, userBlocks []types.ContentBlock) error 
 				Role: string(types.RoleAssistant), Content: parsed.textContent,
 			})
 			log.Debug().Str("text", parsed.textContent).Msg("agent text response")
-			a.emit(event.LLMStream, map[string]any{"text": parsed.textContent})
+			a.emit(EventLLMStream, LLMStreamData{Text: parsed.textContent})
 		}
 
 		if len(parsed.toolCalls) == 0 {

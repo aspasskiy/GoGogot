@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"gogogot/event"
 	"gogogot/llm/types"
 )
 
@@ -35,12 +34,12 @@ func (a *Agent) RunWithEval(ctx context.Context, task string, eval Evaluator) er
 			break
 		}
 
-		a.emit(event.EvalRun, map[string]any{"iteration": iter})
+		a.emit(EventEvalRun, EvalRunData{Iteration: iter})
 		result := eval.Evaluate(ctx)
-		a.emit(event.EvalResult, map[string]any{
-			"iteration": iter,
-			"passed":    result.Passed,
-			"feedback":  result.Feedback,
+		a.emit(EventEvalResult, EvalResultData{
+			Iteration: iter,
+			Passed:    result.Passed,
+			Feedback:  result.Feedback,
 		})
 
 		if result.Passed {

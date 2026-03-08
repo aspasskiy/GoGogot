@@ -6,8 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"gogogot/agent"
-	"gogogot/event"
+	"gogogot/core/agent"
 	"gogogot/store"
 	"gogogot/llm"
 	"gogogot/llm/types"
@@ -127,7 +126,7 @@ func (b *Bridge) runAgent(ctx context.Context, channelID string, msg transport.M
 	blocks, cleanup := processAttachments(a.Chat.ID, msg.Text, msg.Attachments)
 	defer cleanup()
 
-	a.Events = make(chan event.Event, 64)
+	a.Events = make(chan agent.Event, 64)
 	events := a.Events
 
 	go func() {
@@ -186,7 +185,7 @@ func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 	prompt := buildScheduledPrompt(taskID, command, skill)
 	blocks := []types.ContentBlock{types.TextBlock(prompt)}
 
-	a.Events = make(chan event.Event, 64)
+	a.Events = make(chan agent.Event, 64)
 	events := a.Events
 
 	var runErr error
@@ -199,9 +198,9 @@ func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 
 	var finalText string
 	for ev := range events {
-		if ev.Kind == event.LLMStream {
-			if text, ok := ev.Data.(map[string]any)["text"].(string); ok {
-				finalText = text
+		if ev.Kind == agent.EventLLMStream {
+			if d, ok := ev.Data.(agent.LLMStreamData); ok {
+				finalText = d.Text
 			}
 		}
 	}
@@ -260,33 +259,30 @@ var toolLabel = map[string]string{
 	"skill_delete":    "Deleting skill",
 }
 
-func buildToolStatus(data map[string]any) transport.AgentStatus {
-	name, _ := data["name"].(string)
-	detail, _ := data["detail"].(string)
-
-	label := toolLabel[name]
+func buildToolStatus(d agent.ToolStartData) transport.AgentStatus {
+	label := toolLabel[d.Name]
 	if label == "" {
-		label = name
+		label = d.Name
 	}
-	if detail != "" {
-		label = label + ": " + detail
+	if d.Detail != "" {
+		label = label + ": " + d.Detail
 	}
 
 	phase := transport.PhaseTool
-	if name == "task_plan" {
+	if d.Name == "task_plan" {
 		phase = transport.PhasePlanning
 	}
 
-	return transport.AgentStatus{Phase: phase, Tool: name, Detail: label}
+	return transport.AgentStatus{Phase: phase, Tool: d.Name, Detail: label}
 }
 
-func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-chan event.Event, statusID string) {
+func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-chan agent.Event, statusID string) {
 	var finalText string
 	var toolsUsed []string
 
 	for ev := range events {
 		switch ev.Kind {
-		case event.LLMStart:
+		case agent.EventLLMStart:
 			if su, ok := b.transport.(transport.StatusUpdater); ok && statusID != "" {
 				_ = su.UpdateStatus(ctx, channelID, statusID, transport.AgentStatus{Phase: transport.PhaseThinking})
 			}
@@ -294,39 +290,35 @@ func (b *Bridge) consumeEvents(ctx context.Context, channelID string, events <-c
 				_ = tn.SendTyping(ctx, channelID)
 			}
 
-		case event.LLMStream:
-			text, _ := ev.Data.(map[string]any)["text"].(string)
-			finalText = text
+		case agent.EventLLMStream:
+			if d, ok := ev.Data.(agent.LLMStreamData); ok {
+				finalText = d.Text
+			}
 
-		case event.ToolStart:
-			data, _ := ev.Data.(map[string]any)
-			name, _ := data["name"].(string)
-			toolsUsed = append(toolsUsed, name)
-			log.Debug().Str("name", name).Str("channel", channelID).Msg("bridge: tool running")
+		case agent.EventToolStart:
+			d, _ := ev.Data.(agent.ToolStartData)
+			toolsUsed = append(toolsUsed, d.Name)
+			log.Debug().Str("name", d.Name).Str("channel", channelID).Msg("bridge: tool running")
 
 			if su, ok := b.transport.(transport.StatusUpdater); ok && statusID != "" {
-				_ = su.UpdateStatus(ctx, channelID, statusID, buildToolStatus(data))
+				_ = su.UpdateStatus(ctx, channelID, statusID, buildToolStatus(d))
 			}
 			if tn, ok := b.transport.(transport.TypingNotifier); ok {
 				_ = tn.SendTyping(ctx, channelID)
 			}
 
-		case event.Error:
+		case agent.EventError:
 			if ctx.Err() != nil {
 				return
 			}
-			errMap, ok := ev.Data.(map[string]any)
-			var errText string
-			if ok {
-				errText, _ = errMap["error"].(string)
-			}
+			d, _ := ev.Data.(agent.ErrorData)
 			if su, ok := b.transport.(transport.StatusUpdater); ok && statusID != "" {
 				_ = su.DeleteStatus(ctx, channelID, statusID)
 			}
-			_ = b.transport.SendText(ctx, channelID, "Error: "+errText)
+			_ = b.transport.SendText(ctx, channelID, "Error: "+d.Error)
 			return
 
-		case event.Done:
+		case agent.EventDone:
 			cancelled := ctx.Err() != nil
 			log.Info().
 				Str("channel", channelID).
