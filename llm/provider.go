@@ -32,7 +32,6 @@ var aliases = map[string]string{
 	"kimi":     "moonshotai/kimi-k2.5",
 }
 
-var defaultOrder = []string{"claude", "deepseek", "gemini", "qwen", "llama", "kimi", "minimax"}
 
 type anthropicDef struct {
 	Label         string
@@ -49,6 +48,10 @@ var anthropicModels = map[string]anthropicDef{
 	},
 }
 
+var anthropicToOpenRouter = map[string]string{
+	"claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
+}
+
 var (
 	catalogOnce sync.Once
 	catalogData map[string]openrouter.ModelInfo
@@ -62,35 +65,42 @@ func getCatalog() map[string]openrouter.ModelInfo {
 }
 
 // ResolveProvider builds a Provider from a model ID.
-// Accepts a short alias ("deepseek") or a full OpenRouter slug ("deepseek/deepseek-v3.2").
-func ResolveProvider(modelID string) (*Provider, error) {
+// Accepts a short alias ("deepseek"), a full OpenRouter slug ("deepseek/deepseek-v3.2"),
+// and a provider ("anthropic" or "openrouter").
+func ResolveProvider(modelID, provider string) (*Provider, error) {
 	slug := modelID
 	if resolved, ok := aliases[modelID]; ok {
 		slug = resolved
 	}
 
-	if strings.Contains(slug, "/") {
-		return resolveOpenRouter(modelID, slug)
-	}
-
-	if _, ok := anthropicModels[slug]; ok {
-		return resolveAnthropic(modelID, slug)
-	}
-
-	return nil, fmt.Errorf("unknown model %q — use an alias (%s) or a full OpenRouter slug (vendor/model)",
-		modelID, strings.Join(aliasKeys(), ", "))
-}
-
-// DefaultProvider returns the first available provider based on set API keys.
-func DefaultProvider() (*Provider, error) {
-	for _, id := range defaultOrder {
-		p, err := ResolveProvider(id)
-		if err == nil {
-			return p, nil
+	switch provider {
+	case "anthropic":
+		if strings.Contains(slug, "/") {
+			return nil, fmt.Errorf("model %q is an OpenRouter slug — use GOGOGOT_PROVIDER=openrouter or the 'claude' alias", modelID)
 		}
+		if _, ok := anthropicModels[slug]; !ok {
+			return nil, fmt.Errorf("unknown Anthropic model %q — available: claude", modelID)
+		}
+		return resolveAnthropic(modelID, slug)
+
+	case "openrouter":
+		if _, ok := anthropicModels[slug]; ok {
+			if orSlug, ok := anthropicToOpenRouter[slug]; ok {
+				return resolveOpenRouter(modelID, orSlug)
+			}
+			return nil, fmt.Errorf("model %q has no OpenRouter equivalent", modelID)
+		}
+		if !strings.Contains(slug, "/") {
+			return nil, fmt.Errorf("unknown model %q — use an alias (%s) or a full OpenRouter slug (vendor/model)",
+				modelID, strings.Join(aliasKeys(), ", "))
+		}
+		return resolveOpenRouter(modelID, slug)
+
+	default:
+		return nil, fmt.Errorf("unknown provider %q — use 'anthropic' or 'openrouter'", provider)
 	}
-	return nil, fmt.Errorf("no LLM providers available — set ANTHROPIC_API_KEY or OPENROUTER_API_KEY")
 }
+
 
 func resolveAnthropic(id, slug string) (*Provider, error) {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")

@@ -24,7 +24,8 @@ import (
 )
 
 func main() {
-	modelFlag := flag.String("model", "", "model alias or OpenRouter slug (default: first available)")
+	modelFlag := flag.String("model", "", "model alias or OpenRouter slug (required if GOGOGOT_MODEL not set)")
+	providerFlag := flag.String("provider", "", "LLM provider: anthropic or openrouter (required if GOGOGOT_PROVIDER not set)")
 	flag.Parse()
 
 	cfg, err := config.Load()
@@ -34,6 +35,9 @@ func main() {
 	}
 	if *modelFlag != "" {
 		cfg.Model = *modelFlag
+	}
+	if *providerFlag != "" {
+		cfg.Provider = *providerFlag
 	}
 
 	logger.Init(cfg.LogLevel)
@@ -94,10 +98,13 @@ func main() {
 }
 
 func selectProvider(cfg *config.Config) (*llm.Provider, error) {
-	if cfg.Model == "" {
-		return llm.DefaultProvider()
+	if cfg.Provider == "" {
+		return nil, fmt.Errorf("GOGOGOT_PROVIDER is required — set to 'anthropic' or 'openrouter'")
 	}
-	return llm.ResolveProvider(cfg.Model)
+	if cfg.Model == "" {
+		return nil, fmt.Errorf("GOGOGOT_MODEL is required — use an alias (claude, deepseek, gemini, ...) or an OpenRouter slug")
+	}
+	return llm.ResolveProvider(cfg.Model, cfg.Provider)
 }
 
 type storeAdapter struct{}

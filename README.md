@@ -59,6 +59,7 @@ docker run -d --restart unless-stopped \
   --name gogogot \
   -e TELEGRAM_BOT_TOKEN=... \
   -e TELEGRAM_OWNER_ID=... \
+  -e GOGOGOT_PROVIDER=openrouter \
   -e OPENROUTER_API_KEY=... \
   -e GOGOGOT_MODEL=deepseek \
   -v ./data:/data \
@@ -78,6 +79,7 @@ curl -O https://raw.githubusercontent.com/aspasskiy/GoGogot/main/deploy/docker-c
 cat > .env <<EOF
 TELEGRAM_BOT_TOKEN=...
 TELEGRAM_OWNER_ID=...
+GOGOGOT_PROVIDER=openrouter
 OPENROUTER_API_KEY=...
 GOGOGOT_MODEL=deepseek
 EOF
@@ -140,7 +142,9 @@ go run ./cmd
 
 ## Choosing a Model
 
-Set the model via `GOGOGOT_MODEL` env var or `--model` CLI flag. Two providers are supported:
+Set the model via `GOGOGOT_MODEL` env var or `--model` CLI flag. Two providers are supported.
+
+> **Provider and model are required.** You must set `GOGOGOT_PROVIDER` (`anthropic` or `openrouter`), `GOGOGOT_MODEL`, and the corresponding API key (`ANTHROPIC_API_KEY` or `OPENROUTER_API_KEY`). The agent will not start without all three.
 
 **Anthropic** — requires `ANTHROPIC_API_KEY` ([get key](https://console.anthropic.com/)):
 
@@ -149,11 +153,14 @@ docker run -d --restart unless-stopped \
   --name gogogot \
   -e TELEGRAM_BOT_TOKEN=... \
   -e TELEGRAM_OWNER_ID=... \
+  -e GOGOGOT_PROVIDER=anthropic \
   -e ANTHROPIC_API_KEY=... \
-  -e GOGOGOT_MODEL=claude \
+  -e GOGOGOT_MODEL=claude \              # alias → claude-sonnet-4-6
   -v ./data:/data -v ./work:/work \
   octagonlab/gogogot:latest
 ```
+
+Available Anthropic models: `claude-sonnet-4-6` (alias `claude`). Full model names are listed in [`llm/provider.go`](llm/provider.go) (`anthropicModels` map). You can use either the alias or the full name.
 
 **OpenRouter** — 200+ models, requires `OPENROUTER_API_KEY` ([get key](https://openrouter.ai/keys)):
 
@@ -162,13 +169,26 @@ docker run -d --restart unless-stopped \
   --name gogogot \
   -e TELEGRAM_BOT_TOKEN=... \
   -e TELEGRAM_OWNER_ID=... \
+  -e GOGOGOT_PROVIDER=openrouter \
   -e OPENROUTER_API_KEY=... \
-  -e GOGOGOT_MODEL=deepseek \
+  -e GOGOGOT_MODEL=deepseek \            # alias → deepseek/deepseek-v3.2
   -v ./data:/data -v ./work:/work \
   octagonlab/gogogot:latest
 ```
 
-Built-in aliases: `claude`, `deepseek`, `gemini`, `minimax`, `qwen`, `llama`, `kimi`. You can also pass any OpenRouter slug directly: `GOGOGOT_MODEL=openai/gpt-5.4`.
+Built-in aliases and what they resolve to:
+
+| Alias | Model slug |
+|-------|-----------|
+| `claude` | `claude-sonnet-4-6` (Anthropic) / `anthropic/claude-sonnet-4.6` (OpenRouter) |
+| `deepseek` | `deepseek/deepseek-v3.2` |
+| `gemini` | `google/gemini-3-pro-preview` |
+| `minimax` | `minimax/minimax-m2.5` |
+| `qwen` | `qwen/qwen3.5-397b-a17b` |
+| `llama` | `meta-llama/llama-4-maverick` |
+| `kimi` | `moonshotai/kimi-k2.5` |
+
+You can also pass any OpenRouter slug directly: `GOGOGOT_MODEL=openai/gpt-5.4`. All aliases are defined in [`llm/provider.go`](llm/provider.go).
 
 Browse all available models: [OpenRouter Models](https://openrouter.ai/models) | Independent benchmarks: [PinchBench](https://pinchbench.com/)
 

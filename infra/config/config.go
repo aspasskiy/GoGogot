@@ -15,6 +15,7 @@ type Config struct {
 	DataDir         string
 	LogLevel        string
 	Model           string
+	Provider        string // "anthropic" or "openrouter" (required)
 	MaxTokens       int
 }
 
@@ -38,6 +39,7 @@ func Load() (*Config, error) {
 		DataDir:       os.Getenv("GOGOGOT_DATA_DIR"),
 		LogLevel:      envDefault("LOG_LEVEL", "debug"),
 		Model:         os.Getenv("GOGOGOT_MODEL"),
+		Provider:      os.Getenv("GOGOGOT_PROVIDER"),
 		MaxTokens:     4096,
 	}
 
