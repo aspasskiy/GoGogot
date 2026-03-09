@@ -82,6 +82,17 @@ func (t *Transport) Name() string { return "telegram" }
 
 func (t *Transport) Run(ctx context.Context, handler transport.Handler) error {
 	t.handler = handler
+
+	t.b.SetMyCommands(ctx, &bot.SetMyCommandsParams{
+		Commands: []models.BotCommand{
+			{Command: "new", Description: "Start a fresh chat"},
+			{Command: "chats", Description: "List and switch chats"},
+			{Command: "memory", Description: "List memory files"},
+			{Command: "stop", Description: "Cancel the current task"},
+			{Command: "help", Description: "Show available commands"},
+		},
+	})
+
 	log.Info().Int64("owner_id", t.ownerID).Msg("telegram bot polling started")
 	t.b.Start(ctx)
 	return ctx.Err()
