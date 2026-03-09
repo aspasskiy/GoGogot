@@ -167,6 +167,7 @@ func (b *Bridge) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	agentCtx = transport.WithTransport(agentCtx, b.transport, channelID)
 
 	b.mu.Lock()
 	b.cancels[channelID] = cancel
