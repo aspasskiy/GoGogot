@@ -9,53 +9,10 @@ import (
 	"fmt"
 	"gogogot/internal/channel"
 	"io"
-	"net/http"
 	"strings"
 
-	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 )
-
-const (
-	maxTextFileSize    = 512 * 1024
-	maxImageFileSize   = 10 * 1024 * 1024
-	maxGenericFileSize = 20 * 1024 * 1024
-	maxArchiveEntries  = 20
-)
-
-func (t *Channel) downloadFile(ctx context.Context, fileID string) ([]byte, error) {
-	file, err := t.b.GetFile(ctx, &bot.GetFileParams{FileID: fileID})
-	if err != nil {
-		return nil, fmt.Errorf("get file info: %w", err)
-	}
-	url := t.b.FileDownloadLink(file)
-	resp, err := http.Get(url)
-	if err != nil {
-		return nil, fmt.Errorf("download: %w", err)
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download: HTTP %d", resp.StatusCode)
-	}
-	return io.ReadAll(resp.Body)
-}
-
-func isTextMIME(mime string) bool {
-	if strings.HasPrefix(mime, "text/") {
-		return true
-	}
-	textTypes := []string{
-		"application/json", "application/xml", "application/javascript",
-		"application/x-yaml", "application/toml", "application/x-sh",
-		"application/csv", "application/sql",
-	}
-	for _, t := range textTypes {
-		if mime == t {
-			return true
-		}
-	}
-	return false
-}
 
 func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]channel.Attachment, error) {
 	mime := doc.MimeType
@@ -64,7 +21,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 		if doc.FileSize > maxGenericFileSize {
 			return nil, fmt.Errorf("zip file too large (%d bytes)", doc.FileSize)
 		}
-		data, err := t.downloadFile(ctx, doc.FileID)
+		data, err := t.client.DownloadFile(ctx, doc.FileID)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +32,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 		if doc.FileSize > maxGenericFileSize {
 			return nil, fmt.Errorf("tar.gz file too large (%d bytes)", doc.FileSize)
 		}
-		data, err := t.downloadFile(ctx, doc.FileID)
+		data, err := t.client.DownloadFile(ctx, doc.FileID)
 		if err != nil {
 			return nil, err
 		}
@@ -86,7 +43,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 		if doc.FileSize > maxImageFileSize {
 			return nil, fmt.Errorf("image too large (%d bytes)", doc.FileSize)
 		}
-		data, err := t.downloadFile(ctx, doc.FileID)
+		data, err := t.client.DownloadFile(ctx, doc.FileID)
 		if err != nil {
 			return nil, err
 		}
@@ -97,7 +54,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 		if doc.FileSize > maxTextFileSize {
 			return nil, fmt.Errorf("text file too large (%d bytes)", doc.FileSize)
 		}
-		data, err := t.downloadFile(ctx, doc.FileID)
+		data, err := t.client.DownloadFile(ctx, doc.FileID)
 		if err != nil {
 			return nil, err
 		}
@@ -107,7 +64,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 	if doc.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("file too large (%d bytes, max %d)", doc.FileSize, maxGenericFileSize)
 	}
-	data, err := t.downloadFile(ctx, doc.FileID)
+	data, err := t.client.DownloadFile(ctx, doc.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +79,7 @@ func (t *Channel) processPhoto(ctx context.Context, photos []models.PhotoSize) (
 	if largest.FileSize > maxImageFileSize {
 		return nil, fmt.Errorf("photo too large (%d bytes)", largest.FileSize)
 	}
-	data, err := t.downloadFile(ctx, largest.FileID)
+	data, err := t.client.DownloadFile(ctx, largest.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +90,7 @@ func (t *Channel) processAudio(ctx context.Context, audio *models.Audio) ([]chan
 	if audio.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("audio too large (%d bytes)", audio.FileSize)
 	}
-	data, err := t.downloadFile(ctx, audio.FileID)
+	data, err := t.client.DownloadFile(ctx, audio.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +109,7 @@ func (t *Channel) processVoice(ctx context.Context, voice *models.Voice) ([]chan
 	if voice.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("voice too large (%d bytes)", voice.FileSize)
 	}
-	data, err := t.downloadFile(ctx, voice.FileID)
+	data, err := t.client.DownloadFile(ctx, voice.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +124,7 @@ func (t *Channel) processVideo(ctx context.Context, video *models.Video) ([]chan
 	if video.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("video too large (%d bytes)", video.FileSize)
 	}
-	data, err := t.downloadFile(ctx, video.FileID)
+	data, err := t.client.DownloadFile(ctx, video.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +143,7 @@ func (t *Channel) processVideoNote(ctx context.Context, vn *models.VideoNote) ([
 	if vn.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("video note too large (%d bytes)", vn.FileSize)
 	}
-	data, err := t.downloadFile(ctx, vn.FileID)
+	data, err := t.client.DownloadFile(ctx, vn.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -197,7 +154,7 @@ func (t *Channel) processAnimation(ctx context.Context, anim *models.Animation) 
 	if anim.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("animation too large (%d bytes)", anim.FileSize)
 	}
-	data, err := t.downloadFile(ctx, anim.FileID)
+	data, err := t.client.DownloadFile(ctx, anim.FileID)
 	if err != nil {
 		return nil, err
 	}
@@ -219,11 +176,28 @@ func (t *Channel) processSticker(ctx context.Context, sticker *models.Sticker) (
 	if sticker.FileSize > maxImageFileSize {
 		return nil, fmt.Errorf("sticker too large (%d bytes)", sticker.FileSize)
 	}
-	data, err := t.downloadFile(ctx, sticker.FileID)
+	data, err := t.client.DownloadFile(ctx, sticker.FileID)
 	if err != nil {
 		return nil, err
 	}
 	return []channel.Attachment{{Filename: "sticker.webp", MimeType: "image/webp", Data: data}}, nil
+}
+
+func isTextMIME(mime string) bool {
+	if strings.HasPrefix(mime, "text/") {
+		return true
+	}
+	textTypes := []string{
+		"application/json", "application/xml", "application/javascript",
+		"application/x-yaml", "application/toml", "application/x-sh",
+		"application/csv", "application/sql",
+	}
+	for _, t := range textTypes {
+		if mime == t {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldIncludeArchiveEntry(name string) (isText, isImage bool) {

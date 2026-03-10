@@ -62,14 +62,6 @@ func (r *Registry) Definitions() []llmtypes.ToolDef {
 	return out
 }
 
-func (r *Registry) All() []types.Tool {
-	out := make([]types.Tool, 0, len(r.tt))
-	for _, t := range r.tt {
-		out = append(out, t)
-	}
-	return out
-}
-
 func (r *Registry) Register(t types.Tool) {
 	r.tt[t.Name] = t
 	log.Debug().Str("name", t.Name).Msg("tool registered")

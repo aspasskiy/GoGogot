@@ -33,14 +33,6 @@ func sendFileHandler(ctx context.Context, input map[string]any) types.Result {
 		return types.Result{Output: "error: no channel in context", IsErr: true}
 	}
 
-	fs, ok := ch.(channel.FileSender)
-	if !ok {
-		return types.Result{
-			Output: "error: current channel (" + ch.Name() + ") does not support file sending",
-			IsErr:  true,
-		}
-	}
-
 	path, _ := input["path"].(string)
 	if path == "" {
 		return types.Result{Output: "error: path is required", IsErr: true}
@@ -48,7 +40,7 @@ func sendFileHandler(ctx context.Context, input map[string]any) types.Result {
 
 	caption, _ := input["caption"].(string)
 
-	if err := fs.SendFile(ctx, channelID, path, caption); err != nil {
+	if err := ch.SendFile(ctx, channelID, path, caption); err != nil {
 		return types.Result{Output: "failed to send file: " + err.Error(), IsErr: true}
 	}
 	return types.Result{Output: "File sent successfully"}

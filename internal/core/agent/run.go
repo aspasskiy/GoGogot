@@ -2,10 +2,9 @@ package agent
 
 import (
 	"context"
-	"encoding/json"
 	event2 "gogogot/internal/core/agent/event"
 	"gogogot/internal/core/agent/hook"
-	"gogogot/internal/core/agent/prompt"
+	"gogogot/internal/core/prompt"
 	"gogogot/internal/llm"
 	"gogogot/internal/llm/types"
 	"gogogot/internal/tools/store"
@@ -180,12 +179,3 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []types.Conte
 	return results, summaries
 }
 
-func unmarshalToolInput(raw json.RawMessage) map[string]any {
-	var input map[string]any
-	if len(raw) > 0 {
-		if err := json.Unmarshal(raw, &input); err != nil {
-			log.Error().Err(err).Msg("failed to unmarshal tool input")
-		}
-	}
-	return input
-}

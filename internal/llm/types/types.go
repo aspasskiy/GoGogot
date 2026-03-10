@@ -70,7 +70,3 @@ func ExtractText(blocks []ContentBlock) string {
 func NewUserMessage(blocks ...ContentBlock) Message {
 	return Message{Role: RoleUser, Content: blocks}
 }
-
-func NewAssistantMessage(blocks ...ContentBlock) Message {
-	return Message{Role: RoleAssistant, Content: blocks}
-}

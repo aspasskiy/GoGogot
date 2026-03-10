@@ -7,7 +7,7 @@ import (
 	"gogogot/internal/channel"
 	"gogogot/internal/core/agent"
 	event2 "gogogot/internal/core/agent/event"
-	"gogogot/internal/core/agent/prompt"
+	"gogogot/internal/core/prompt"
 	transport2 "gogogot/internal/core/transport"
 	"gogogot/internal/infra/config"
 	"gogogot/internal/infra/scheduler"
@@ -26,7 +26,7 @@ import (
 const defaultEpisodeGap = 2 * time.Hour
 
 type Engine struct {
-	transport  *transport2.Transport
+	ch         channel.Channel
 	llmClient  llm2.LLM
 	agent      *agent.Agent
 	store      *store2.Store
@@ -51,8 +51,6 @@ func New(cfg *config.Config, ch channel.Channel) (*Engine, error) {
 	}
 
 	sched := scheduler.New(cfg.DataDir, nil, st.LoadTimezone())
-
-	t := transport2.New(ch)
 
 	extra := append(transport2.ChannelTools(),
 		system.ScheduleTools(sched)...,
@@ -82,7 +80,7 @@ func New(cfg *config.Config, ch channel.Channel) (*Engine, error) {
 	}
 
 	eng := &Engine{
-		transport:  t,
+		ch:         ch,
 		llmClient:  client,
 		store:      st,
 		scheduler:  sched,
@@ -92,7 +90,7 @@ func New(cfg *config.Config, ch channel.Channel) (*Engine, error) {
 	}
 	eng.agent = agent.New(client, agentCfg, reg)
 
-	ownerChannelID := t.OwnerChannelID()
+	ownerChannelID := ch.OwnerChannelID()
 	sched.SetExecutor(func(ctx context.Context, taskID, command, skill string) (string, error) {
 		return eng.RunScheduledTask(ctx, ownerChannelID, taskID, command, skill)
 	})
@@ -106,7 +104,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	}
 	defer e.scheduler.Stop()
 
-	return e.transport.Run(ctx, e.handleMessage)
+	return e.ch.Run(ctx, e.handleMessage)
 }
 
 func resolveProvider(cfg *config.Config) (*llm2.Provider, error) {
@@ -119,8 +117,8 @@ func resolveProvider(cfg *config.Config) (*llm2.Provider, error) {
 	return llm2.ResolveProvider(cfg.Model, cfg.Provider)
 }
 
-func (e *Engine) Transport() *transport2.Transport {
-	return e.transport
+func (e *Engine) Channel() channel.Channel {
+	return e.ch
 }
 
 func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
@@ -136,7 +134,7 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 	e.mu.Unlock()
 
 	if busy {
-		_ = e.transport.SendText(ctx, channelID, "Still working on the previous task, please wait...")
+		_ = e.ch.SendText(ctx, channelID, "Still working on the previous task, please wait...")
 		return
 	}
 
@@ -193,14 +191,14 @@ func (e *Engine) runAgent(ctx context.Context, channelID string, msg channel.Mes
 	ep, err := e.loadEpisode(agentCtx, channelID)
 	if err != nil {
 		log.Error().Err(err).Msg("engine: failed to load episode")
-		_ = e.transport.SendText(ctx, channelID, "Error: "+err.Error())
+		_ = e.ch.SendText(ctx, channelID, "Error: "+err.Error())
 		return
 	}
 
-	e.transport.NotifyTyping(ctx, channelID)
-	statusID := e.transport.SendInitialStatus(ctx, channelID)
+	_ = e.ch.SendTyping(ctx, channelID)
+	statusID, _ := e.ch.SendStatus(ctx, channelID, channel.AgentStatus{Phase: channel.PhaseThinking})
 
-	agentCtx = channel.WithChannel(agentCtx, e.transport.Channel(), channelID)
+	agentCtx = channel.WithChannel(agentCtx, e.ch, channelID)
 
 	blocks, cleanup := transport2.ProcessAttachments(ep.ID, msg.Text, msg.Attachments)
 	defer cleanup()
@@ -213,9 +211,9 @@ func (e *Engine) runAgent(ctx context.Context, channelID string, msg channel.Mes
 		}
 	}()
 
-	finalText := e.transport.ConsumeEvents(agentCtx, channelID, recv, statusID)
+	finalText := transport2.ConsumeEvents(agentCtx, e.ch, channelID, recv, statusID)
 	if finalText != "" {
-		_ = e.transport.SendText(ctx, channelID, finalText)
+		_ = e.ch.SendText(ctx, channelID, finalText)
 	}
 }
 
@@ -225,12 +223,12 @@ func (e *Engine) stopAgent(ctx context.Context, channelID string) {
 	e.mu.Unlock()
 
 	if !running {
-		_ = e.transport.SendText(ctx, channelID, "Nothing to cancel.")
+		_ = e.ch.SendText(ctx, channelID, "Nothing to cancel.")
 		return
 	}
 
 	cancel()
-	_ = e.transport.SendText(ctx, channelID, "⏹ Stopping...")
+	_ = e.ch.SendText(ctx, channelID, "⏹ Stopping...")
 }
 
 // RunScheduledTask executes a scheduled task in the active episode for the
@@ -247,7 +245,7 @@ func (e *Engine) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	agentCtx = channel.WithChannel(agentCtx, e.transport.Channel(), channelID)
+	agentCtx = channel.WithChannel(agentCtx, e.ch, channelID)
 
 	e.mu.Lock()
 	e.cancels[channelID] = cancel
@@ -263,7 +261,7 @@ func (e *Engine) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 		return "", fmt.Errorf("load episode: %w", err)
 	}
 
-	promptText := buildScheduledPrompt(taskID, command, skill)
+	promptText := prompt.ScheduledTaskPrompt(taskID, command, skill)
 	blocks := []types.ContentBlock{types.TextBlock(promptText)}
 
 	bus, recv := event2.NewBus(64)
@@ -290,7 +288,7 @@ func (e *Engine) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 	}
 
 	if finalText != "" {
-		_ = e.transport.SendText(ctx, channelID, finalText)
+		_ = e.ch.SendText(ctx, channelID, finalText)
 	}
 
 	return finalText, nil
@@ -346,18 +344,6 @@ func (e *Engine) resetEpisode(ctx context.Context, channelID string) error {
 		return err
 	}
 	return e.store.SetActiveEpisodeMapping(channelID, newEp.ID)
-}
-
-func buildScheduledPrompt(taskID, command, skill string) string {
-	var b strings.Builder
-	fmt.Fprintf(&b, "[Scheduled Task: %s]\n", taskID)
-	b.WriteString("You woke up from a scheduled trigger. Execute the following instruction " +
-		"using your tools, memory, and skills. Do not write standalone scripts.\n\n")
-	fmt.Fprintf(&b, "Instruction: %s", command)
-	if skill != "" {
-		fmt.Fprintf(&b, "\nSkill: Read skill %q with skill_read and follow its instructions.", skill)
-	}
-	return b.String()
 }
 
 type episodeSummaryResult struct {

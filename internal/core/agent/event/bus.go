@@ -19,11 +19,6 @@ func NewBus(size int) (*Bus, <-chan Event) {
 	return &Bus{ch: ch}, ch
 }
 
-// NopBus returns a Bus that silently discards all emitted events.
-func NopBus() *Bus {
-	return &Bus{}
-}
-
 // Emit sends an event without blocking. If the channel is full the event
 // is dropped and a warning is logged.
 func (b *Bus) Emit(kind Kind, data any) {

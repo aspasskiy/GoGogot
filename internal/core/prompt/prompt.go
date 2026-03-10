@@ -258,6 +258,19 @@ IMPORTANT: You must ask for their timezone immediately and include a "timezone: 
 	return b.String()
 }
 
+// ScheduledTaskPrompt builds the user-facing prompt injected when a scheduled task fires.
+func ScheduledTaskPrompt(taskID, command, skill string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "[Scheduled Task: %s]\n", taskID)
+	b.WriteString("You woke up from a scheduled trigger. Execute the following instruction " +
+		"using your tools, memory, and skills. Do not write standalone scripts.\n\n")
+	fmt.Fprintf(&b, "Instruction: %s", command)
+	if skill != "" {
+		fmt.Fprintf(&b, "\nSkill: Read skill %q with skill_read and follow its instructions.", skill)
+	}
+	return b.String()
+}
+
 func sanitizePromptValue(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")

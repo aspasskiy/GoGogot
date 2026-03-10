@@ -1,4 +1,4 @@
-package telegram
+package format
 
 import (
 	"fmt"
@@ -340,22 +340,6 @@ func (w *htmlWriter) renderTableAsBullets(table ast.Node, source []byte) {
 			w.writeText("\n")
 		}
 	}
-}
-
-// FormatHTML converts markdown into Telegram-compatible HTML.
-func FormatHTML(s string) string {
-	if s == "" {
-		return ""
-	}
-	source := []byte(s)
-	doc := mdParser.Parser().Parse(mdtext.NewReader(source))
-	w := &htmlWriter{}
-	w.walkNode(doc, source)
-	result := w.finish()
-	if len(result) == 0 {
-		return ""
-	}
-	return result[0].HTML
 }
 
 // FormatHTMLChunks converts markdown into Telegram HTML chunks, each within

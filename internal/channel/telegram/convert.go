@@ -5,39 +5,10 @@ import (
 	"fmt"
 	"gogogot/internal/channel"
 	"strings"
-	"time"
 
-	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"
 )
-
-func (t *Channel) handleMediaGroup(ctx context.Context, msg *models.Message) {
-	t.mu.Lock()
-	defer t.mu.Unlock()
-
-	groupID := msg.MediaGroupID
-	if buf, ok := t.mediaGroups[groupID]; ok {
-		buf.messages = append(buf.messages, msg)
-		buf.timer.Reset(1 * time.Second)
-	} else {
-		buf := &mediaGroupBuffer{
-			messages: []*models.Message{msg},
-		}
-		buf.timer = time.AfterFunc(1*time.Second, func() {
-			if ctx.Err() != nil {
-				return
-			}
-			t.mu.Lock()
-			msgs := t.mediaGroups[groupID].messages
-			delete(t.mediaGroups, groupID)
-			t.mu.Unlock()
-
-			t.convertAndDispatch(ctx, msgs)
-		})
-		t.mediaGroups[groupID] = buf
-	}
-}
 
 type mediaExtractor struct {
 	check   func(*models.Message) bool
@@ -198,61 +169,4 @@ func (t *Channel) convertAndDispatch(ctx context.Context, msgs []*models.Message
 		Text:        text,
 		Attachments: attachments,
 	})
-}
-
-var commandMap = map[string]string{
-	"/start":   channel.CmdNewEpisode,
-	"/new":     channel.CmdNewEpisode,
-	"/stop":    channel.CmdStop,
-	"/history": channel.CmdHistory,
-	"/memory":  channel.CmdMemory,
-}
-
-var commandSuccess = map[string]string{
-	channel.CmdNewEpisode: "✨ New conversation started.",
-}
-
-var commandEmpty = map[string]string{
-	channel.CmdHistory: "No conversation history yet.",
-	channel.CmdMemory:  "Memory is empty — no files yet.",
-}
-
-func (t *Channel) handleCommand(ctx context.Context, chatID int64, channelID, cmdText string) {
-	if cmdText == "/help" {
-		t.send(ctx, chatID, "*Commands:*\n"+
-			"/new — start a fresh conversation\n"+
-			"/history — view past conversation episodes\n"+
-			"/memory — list memory files\n"+
-			"/stop — cancel the current task\n"+
-			"/help — show this help")
-		return
-	}
-
-	name, ok := commandMap[cmdText]
-	if !ok {
-		t.send(ctx, chatID, "Unknown command\\. Try /help")
-		return
-	}
-
-	cmd := &channel.Command{Name: name, Result: &channel.CommandResult{}}
-	t.handler(ctx, channel.Message{ChannelID: channelID, Command: cmd})
-
-	if cmd.Result.Error != nil {
-		t.send(ctx, chatID, "Error: "+bot.EscapeMarkdown(cmd.Result.Error.Error()))
-		return
-	}
-
-	if text := cmd.Result.Data["text"]; text != "" {
-		t.sendLong(ctx, chatID, text)
-		return
-	}
-
-	if msg, ok := commandSuccess[name]; ok {
-		t.sendLong(ctx, chatID, msg)
-		return
-	}
-
-	if msg, ok := commandEmpty[name]; ok {
-		t.sendLong(ctx, chatID, msg)
-	}
 }

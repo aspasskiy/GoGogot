@@ -58,15 +58,17 @@ func BuildToolStatus(d event.ToolStartData) channel.AgentStatus {
 
 // ConsumeEvents reads agent events and translates them into channel
 // interactions (typing, status updates, text). Returns the final text output.
-func (t *Transport) ConsumeEvents(ctx context.Context, channelID string, events <-chan event.Event, statusID string) string {
+func ConsumeEvents(ctx context.Context, ch channel.Channel, channelID string, events <-chan event.Event, statusID string) string {
 	var finalText string
 	var toolsUsed []string
 
 	for ev := range events {
 		switch ev.Kind {
 		case event.LLMStart:
-			t.UpdateStatus(ctx, channelID, statusID, channel.AgentStatus{Phase: channel.PhaseThinking})
-			t.NotifyTyping(ctx, channelID)
+			if statusID != "" {
+				_ = ch.UpdateStatus(ctx, channelID, statusID, channel.AgentStatus{Phase: channel.PhaseThinking})
+			}
+			_ = ch.SendTyping(ctx, channelID)
 
 		case event.LLMStream:
 			if d, ok := ev.Data.(event.LLMStreamData); ok {
@@ -78,16 +80,20 @@ func (t *Transport) ConsumeEvents(ctx context.Context, channelID string, events 
 			toolsUsed = append(toolsUsed, d.Name)
 			log.Debug().Str("name", d.Name).Str("channel", channelID).Msg("transport: tool running")
 
-			t.UpdateStatus(ctx, channelID, statusID, BuildToolStatus(d))
-			t.NotifyTyping(ctx, channelID)
+			if statusID != "" {
+				_ = ch.UpdateStatus(ctx, channelID, statusID, BuildToolStatus(d))
+			}
+			_ = ch.SendTyping(ctx, channelID)
 
 		case event.Error:
 			if ctx.Err() != nil {
 				return ""
 			}
 			d, _ := ev.Data.(event.ErrorData)
-			t.DeleteStatus(ctx, channelID, statusID)
-			_ = t.ch.SendText(ctx, channelID, "Error: "+d.Error)
+			if statusID != "" {
+				_ = ch.DeleteStatus(ctx, channelID, statusID)
+			}
+			_ = ch.SendText(ctx, channelID, "Error: "+d.Error)
 			return ""
 
 		case event.Done:
@@ -98,7 +104,9 @@ func (t *Transport) ConsumeEvents(ctx context.Context, channelID string, events 
 				Int("response_len", len(finalText)).
 				Bool("cancelled", cancelled).
 				Msg("transport: agent done")
-			t.DeleteStatus(context.Background(), channelID, statusID)
+			if statusID != "" {
+				_ = ch.DeleteStatus(context.Background(), channelID, statusID)
+			}
 			if cancelled {
 				return ""
 			}
