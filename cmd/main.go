@@ -50,9 +50,9 @@ func notifyOwnerAndBlock(ch *telegram.Channel, providerErr error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	channelID := ch.OwnerChannelID()
+	_, reply := ch.OwnerSession()
 	msg := fmt.Sprintf("⚠️ Failed to start:\n\n%v\n\nFix environment variables and restart the container.", providerErr)
-	_ = ch.SendText(ctx, channelID, msg)
+	_ = reply.SendText(ctx, msg)
 
 	fmt.Fprintf(os.Stderr, "error: %v\nBlocking to prevent restart loop. Fix env vars and restart manually.\n", providerErr)
 

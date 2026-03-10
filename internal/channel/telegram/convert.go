@@ -72,7 +72,8 @@ func (t *Channel) convertAndDispatch(ctx context.Context, msgs []*models.Message
 	}
 
 	chatID := msgs[0].Chat.ID
-	channelID := fmt.Sprintf("%s%d", channelPrefix, chatID)
+	sessionID := fmt.Sprintf("%s%d", channelPrefix, chatID)
+	reply := t.newReplier(chatID)
 	var textParts []string
 	var attachments []channel.Attachment
 
@@ -160,13 +161,14 @@ func (t *Channel) convertAndDispatch(ctx context.Context, msgs []*models.Message
 	if strings.HasPrefix(text, "/") {
 		cmdName := strings.Fields(text)[0]
 		log.Info().Str("cmd", cmdName).Msg("command received")
-		t.handleCommand(ctx, chatID, channelID, cmdName)
+		t.handleCommand(ctx, chatID, sessionID, reply, cmdName)
 		return
 	}
 
 	t.handler(ctx, channel.Message{
-		ChannelID:   channelID,
+		SessionID:   sessionID,
 		Text:        text,
 		Attachments: attachments,
+		Reply:       reply,
 	})
 }

@@ -36,20 +36,12 @@ func formatStatus(s channel.AgentStatus) string {
 	return emoji + " " + client.EscapeMarkdown(label) + "\\.\\.\\."
 }
 
-func (t *Channel) SendStatus(ctx context.Context, channelID string, status channel.AgentStatus) (string, error) {
-	chatID, err := parseChatID(channelID)
-	if err != nil {
-		return "", err
-	}
-	msgID := t.sendAndGetID(ctx, chatID, formatStatus(status))
+func (r *replier) SendStatus(ctx context.Context, status channel.AgentStatus) (string, error) {
+	msgID := r.ch.sendAndGetID(ctx, r.chatID, formatStatus(status))
 	return strconv.Itoa(msgID), nil
 }
 
-func (t *Channel) UpdateStatus(ctx context.Context, channelID, statusID string, status channel.AgentStatus) error {
-	chatID, err := parseChatID(channelID)
-	if err != nil {
-		return err
-	}
+func (r *replier) UpdateStatus(ctx context.Context, statusID string, status channel.AgentStatus) error {
 	msgID, err := strconv.Atoi(statusID)
 	if err != nil {
 		return fmt.Errorf("invalid status ID: %w", err)
@@ -57,18 +49,14 @@ func (t *Channel) UpdateStatus(ctx context.Context, channelID, statusID string, 
 	if msgID == 0 {
 		return nil
 	}
-	err = t.client.EditMessage(ctx, chatID, msgID, formatStatus(status), models.ParseModeMarkdown)
+	err = r.ch.client.EditMessage(ctx, r.chatID, msgID, formatStatus(status), models.ParseModeMarkdown)
 	if err != nil {
 		log.Debug().Err(err).Msg("telegram edit failed")
 	}
 	return nil
 }
 
-func (t *Channel) DeleteStatus(ctx context.Context, channelID, statusID string) error {
-	chatID, err := parseChatID(channelID)
-	if err != nil {
-		return err
-	}
+func (r *replier) DeleteStatus(ctx context.Context, statusID string) error {
 	msgID, err := strconv.Atoi(statusID)
 	if err != nil {
 		return fmt.Errorf("invalid status ID: %w", err)
@@ -76,7 +64,7 @@ func (t *Channel) DeleteStatus(ctx context.Context, channelID, statusID string) 
 	if msgID == 0 {
 		return nil
 	}
-	err = t.client.DeleteMessage(ctx, chatID, msgID)
+	err = r.ch.client.DeleteMessage(ctx, r.chatID, msgID)
 	if err != nil {
 		log.Debug().Err(err).Msg("telegram delete failed")
 	}

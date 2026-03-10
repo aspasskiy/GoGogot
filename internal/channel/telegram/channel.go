@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"gogogot/internal/channel"
 	"gogogot/internal/channel/telegram/client"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -44,9 +43,21 @@ func New(token string, ownerID int64) (*Channel, error) {
 	return t, nil
 }
 
-func (t *Channel) Name() string            { return "telegram" }
-func (t *Channel) OwnerID() int64          { return t.ownerID }
-func (t *Channel) OwnerChannelID() string  { return fmt.Sprintf("tg_%d", t.ownerID) }
+type replier struct {
+	ch     *Channel
+	chatID int64
+}
+
+func (t *Channel) Name() string   { return "telegram" }
+func (t *Channel) OwnerID() int64 { return t.ownerID }
+
+func (t *Channel) OwnerSession() (string, channel.Replier) {
+	return fmt.Sprintf("%s%d", channelPrefix, t.ownerID), t.newReplier(t.ownerID)
+}
+
+func (t *Channel) newReplier(chatID int64) *replier {
+	return &replier{ch: t, chatID: chatID}
+}
 
 func (t *Channel) Run(ctx context.Context, handler channel.Handler) error {
 	t.handler = handler
@@ -106,10 +117,6 @@ func (t *Channel) handleMediaGroup(ctx context.Context, msg *models.Message) {
 		})
 		t.mediaGroups[groupID] = buf
 	}
-}
-
-func parseChatID(channelID string) (int64, error) {
-	return strconv.ParseInt(strings.TrimPrefix(channelID, channelPrefix), 10, 64)
 }
 
 func basename(path string) string {

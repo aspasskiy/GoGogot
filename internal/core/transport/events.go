@@ -58,7 +58,7 @@ func BuildToolStatus(d event.ToolStartData) channel.AgentStatus {
 
 // ConsumeEvents reads agent events and translates them into channel
 // interactions (typing, status updates, text). Returns the final text output.
-func ConsumeEvents(ctx context.Context, ch channel.Channel, channelID string, events <-chan event.Event, statusID string) string {
+func ConsumeEvents(ctx context.Context, reply channel.Replier, events <-chan event.Event, statusID string) string {
 	var finalText string
 	var toolsUsed []string
 
@@ -66,9 +66,9 @@ func ConsumeEvents(ctx context.Context, ch channel.Channel, channelID string, ev
 		switch ev.Kind {
 		case event.LLMStart:
 			if statusID != "" {
-				_ = ch.UpdateStatus(ctx, channelID, statusID, channel.AgentStatus{Phase: channel.PhaseThinking})
+				_ = reply.UpdateStatus(ctx, statusID, channel.AgentStatus{Phase: channel.PhaseThinking})
 			}
-			_ = ch.SendTyping(ctx, channelID)
+			_ = reply.SendTyping(ctx)
 
 		case event.LLMStream:
 			if d, ok := ev.Data.(event.LLMStreamData); ok {
@@ -78,12 +78,12 @@ func ConsumeEvents(ctx context.Context, ch channel.Channel, channelID string, ev
 		case event.ToolStart:
 			d, _ := ev.Data.(event.ToolStartData)
 			toolsUsed = append(toolsUsed, d.Name)
-			log.Debug().Str("name", d.Name).Str("channel", channelID).Msg("transport: tool running")
+			log.Debug().Str("name", d.Name).Msg("transport: tool running")
 
 			if statusID != "" {
-				_ = ch.UpdateStatus(ctx, channelID, statusID, BuildToolStatus(d))
+				_ = reply.UpdateStatus(ctx, statusID, BuildToolStatus(d))
 			}
-			_ = ch.SendTyping(ctx, channelID)
+			_ = reply.SendTyping(ctx)
 
 		case event.Error:
 			if ctx.Err() != nil {
@@ -91,21 +91,20 @@ func ConsumeEvents(ctx context.Context, ch channel.Channel, channelID string, ev
 			}
 			d, _ := ev.Data.(event.ErrorData)
 			if statusID != "" {
-				_ = ch.DeleteStatus(ctx, channelID, statusID)
+				_ = reply.DeleteStatus(ctx, statusID)
 			}
-			_ = ch.SendText(ctx, channelID, "Error: "+d.Error)
+			_ = reply.SendText(ctx, "Error: "+d.Error)
 			return ""
 
 		case event.Done:
 			cancelled := ctx.Err() != nil
 			log.Info().
-				Str("channel", channelID).
 				Strs("tools_used", toolsUsed).
 				Int("response_len", len(finalText)).
 				Bool("cancelled", cancelled).
 				Msg("transport: agent done")
 			if statusID != "" {
-				_ = ch.DeleteStatus(context.Background(), channelID, statusID)
+				_ = reply.DeleteStatus(context.Background(), statusID)
 			}
 			if cancelled {
 				return ""

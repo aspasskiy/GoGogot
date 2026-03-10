@@ -23,7 +23,7 @@ var commandEmpty = map[string]string{
 	channel.CmdMemory:  "Memory is empty — no files yet.",
 }
 
-func (t *Channel) handleCommand(ctx context.Context, chatID int64, channelID, cmdText string) {
+func (t *Channel) handleCommand(ctx context.Context, chatID int64, sessionID string, reply channel.Replier, cmdText string) {
 	if cmdText == "/help" {
 		t.send(ctx, chatID, "*Commands:*\n"+
 			"/new — start a fresh conversation\n"+
@@ -41,7 +41,7 @@ func (t *Channel) handleCommand(ctx context.Context, chatID int64, channelID, cm
 	}
 
 	cmd := &channel.Command{Name: name, Result: &channel.CommandResult{}}
-	t.handler(ctx, channel.Message{ChannelID: channelID, Command: cmd})
+	t.handler(ctx, channel.Message{SessionID: sessionID, Reply: reply, Command: cmd})
 
 	if cmd.Result.Error != nil {
 		t.send(ctx, chatID, "Error: "+client.EscapeMarkdown(cmd.Result.Error.Error()))

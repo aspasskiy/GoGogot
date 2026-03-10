@@ -13,21 +13,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func (t *Channel) SendText(ctx context.Context, channelID string, text string) error {
-	chatID, err := parseChatID(channelID)
-	if err != nil {
-		return err
-	}
-	t.sendLong(ctx, chatID, text)
+func (r *replier) SendText(ctx context.Context, text string) error {
+	r.ch.sendLong(ctx, r.chatID, text)
 	return nil
 }
 
-func (t *Channel) SendFile(ctx context.Context, channelID, path, caption string) error {
-	chatID, err := parseChatID(channelID)
-	if err != nil {
-		return err
-	}
-
+func (r *replier) SendFile(ctx context.Context, path, caption string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("read file: %w", err)
@@ -38,26 +29,22 @@ func (t *Channel) SendFile(ctx context.Context, channelID, path, caption string)
 
 	switch {
 	case utils.HasAnySuffix(lower, ".jpg", ".jpeg", ".png", ".webp"):
-		return t.client.SendPhoto(ctx, chatID, upload, caption)
+		return r.ch.client.SendPhoto(ctx, r.chatID, upload, caption)
 	case utils.HasAnySuffix(lower, ".mp4", ".mov", ".avi", ".mkv"):
-		return t.client.SendVideo(ctx, chatID, upload, caption)
+		return r.ch.client.SendVideo(ctx, r.chatID, upload, caption)
 	case utils.HasAnySuffix(lower, ".mp3", ".wav", ".flac", ".aac", ".m4a"):
-		return t.client.SendAudio(ctx, chatID, upload, caption)
+		return r.ch.client.SendAudio(ctx, r.chatID, upload, caption)
 	case utils.HasAnySuffix(lower, ".ogg", ".opus"):
-		return t.client.SendVoice(ctx, chatID, upload, caption)
+		return r.ch.client.SendVoice(ctx, r.chatID, upload, caption)
 	case utils.HasAnySuffix(lower, ".gif"):
-		return t.client.SendAnimation(ctx, chatID, upload, caption)
+		return r.ch.client.SendAnimation(ctx, r.chatID, upload, caption)
 	default:
-		return t.client.SendDocument(ctx, chatID, upload, caption)
+		return r.ch.client.SendDocument(ctx, r.chatID, upload, caption)
 	}
 }
 
-func (t *Channel) SendTyping(ctx context.Context, channelID string) error {
-	chatID, err := parseChatID(channelID)
-	if err != nil {
-		return err
-	}
-	return t.client.SendTyping(ctx, chatID)
+func (r *replier) SendTyping(ctx context.Context) error {
+	return r.ch.client.SendTyping(ctx, r.chatID)
 }
 
 func (t *Channel) send(ctx context.Context, chatID int64, markdownText string) {

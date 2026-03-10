@@ -21,10 +21,11 @@ type CommandResult struct {
 }
 
 type Message struct {
-	ChannelID   string
+	SessionID   string
 	Text        string
 	Attachments []Attachment
 	Command     *Command
+	Reply       Replier
 }
 
 type Attachment struct {
@@ -35,19 +36,23 @@ type Attachment struct {
 
 type Handler func(ctx context.Context, msg Message)
 
+// Replier sends responses back to the user within a specific session.
+// Each channel creates a Replier per conversation/chat.
+type Replier interface {
+	SendText(ctx context.Context, text string) error
+	SendFile(ctx context.Context, path, caption string) error
+	SendTyping(ctx context.Context) error
+
+	SendStatus(ctx context.Context, status AgentStatus) (statusID string, err error)
+	UpdateStatus(ctx context.Context, statusID string, status AgentStatus) error
+	DeleteStatus(ctx context.Context, statusID string) error
+}
+
 // Channel is the interface every communication channel must implement.
 type Channel interface {
 	Name() string
-	OwnerChannelID() string
+	OwnerSession() (sessionID string, reply Replier)
 	Run(ctx context.Context, handler Handler) error
-
-	SendText(ctx context.Context, channelID string, text string) error
-	SendFile(ctx context.Context, channelID, path, caption string) error
-	SendTyping(ctx context.Context, channelID string) error
-
-	SendStatus(ctx context.Context, channelID string, status AgentStatus) (statusID string, err error)
-	UpdateStatus(ctx context.Context, channelID, statusID string, status AgentStatus) error
-	DeleteStatus(ctx context.Context, channelID, statusID string) error
 }
 
 // Phase represents a high-level stage of the agent's work.

@@ -28,9 +28,9 @@ func ChannelTools() []types.Tool {
 }
 
 func sendFileHandler(ctx context.Context, input map[string]any) types.Result {
-	ch, channelID, ok := channel.FromContext(ctx)
+	reply, ok := channel.ReplierFromContext(ctx)
 	if !ok {
-		return types.Result{Output: "error: no channel in context", IsErr: true}
+		return types.Result{Output: "error: no replier in context", IsErr: true}
 	}
 
 	path, _ := input["path"].(string)
@@ -40,7 +40,7 @@ func sendFileHandler(ctx context.Context, input map[string]any) types.Result {
 
 	caption, _ := input["caption"].(string)
 
-	if err := ch.SendFile(ctx, channelID, path, caption); err != nil {
+	if err := reply.SendFile(ctx, path, caption); err != nil {
 		return types.Result{Output: "failed to send file: " + err.Error(), IsErr: true}
 	}
 	return types.Result{Output: "File sent successfully"}

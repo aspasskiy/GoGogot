@@ -2,20 +2,13 @@ package channel
 
 import "context"
 
-type ctxKey int
+type ctxKey struct{}
 
-const (
-	ctxKeyChannel ctxKey = iota
-	ctxKeyChannelID
-)
-
-func WithChannel(ctx context.Context, ch Channel, channelID string) context.Context {
-	ctx = context.WithValue(ctx, ctxKeyChannel, ch)
-	return context.WithValue(ctx, ctxKeyChannelID, channelID)
+func WithReplier(ctx context.Context, r Replier) context.Context {
+	return context.WithValue(ctx, ctxKey{}, r)
 }
 
-func FromContext(ctx context.Context) (Channel, string, bool) {
-	ch, ok1 := ctx.Value(ctxKeyChannel).(Channel)
-	id, ok2 := ctx.Value(ctxKeyChannelID).(string)
-	return ch, id, ok1 && ok2
+func ReplierFromContext(ctx context.Context) (Replier, bool) {
+	r, ok := ctx.Value(ctxKey{}).(Replier)
+	return r, ok
 }

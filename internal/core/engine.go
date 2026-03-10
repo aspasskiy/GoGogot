@@ -90,9 +90,9 @@ func New(cfg *config.Config, ch channel.Channel) (*Engine, error) {
 	}
 	eng.agent = agent.New(client, agentCfg, reg)
 
-	ownerChannelID := ch.OwnerChannelID()
+	ownerSessionID, ownerReply := ch.OwnerSession()
 	sched.SetExecutor(func(ctx context.Context, taskID, command, skill string) (string, error) {
-		return eng.RunScheduledTask(ctx, ownerChannelID, taskID, command, skill)
+		return eng.RunScheduledTask(ctx, ownerSessionID, ownerReply, taskID, command, skill)
 	})
 
 	return eng, nil
@@ -127,14 +127,12 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 		return
 	}
 
-	channelID := msg.ChannelID
-
 	e.mu.Lock()
-	_, busy := e.cancels[channelID]
+	_, busy := e.cancels[msg.SessionID]
 	e.mu.Unlock()
 
 	if busy {
-		_ = e.ch.SendText(ctx, channelID, "Still working on the previous task, please wait...")
+		_ = msg.Reply.SendText(ctx, "Still working on the previous task, please wait...")
 		return
 	}
 
@@ -143,21 +141,21 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 	}
 
 	log.Info().
-		Str("channel", channelID).
+		Str("session", msg.SessionID).
 		Int("text_len", len(msg.Text)).
 		Int("attachments", len(msg.Attachments)).
 		Msg("engine: incoming message")
 
-	go e.runAgent(ctx, channelID, msg)
+	go e.runAgent(ctx, msg)
 }
 
 func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	cmd := msg.Command
 	switch cmd.Name {
 	case channel.CmdNewEpisode:
-		cmd.Result.Error = e.resetEpisode(ctx, msg.ChannelID)
+		cmd.Result.Error = e.resetEpisode(ctx, msg.SessionID)
 	case channel.CmdStop:
-		e.stopAgent(ctx, msg.ChannelID)
+		e.stopAgent(msg.SessionID, cmd)
 	case channel.CmdHistory:
 		episodes, err := e.store.ListEpisodes()
 		if err != nil {
@@ -175,30 +173,33 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	}
 }
 
-func (e *Engine) runAgent(ctx context.Context, channelID string, msg channel.Message) {
+func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
+	reply := msg.Reply
+	sessionID := msg.SessionID
+
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	e.mu.Lock()
-	e.cancels[channelID] = cancel
+	e.cancels[sessionID] = cancel
 	e.mu.Unlock()
 	defer func() {
 		e.mu.Lock()
-		delete(e.cancels, channelID)
+		delete(e.cancels, sessionID)
 		e.mu.Unlock()
 	}()
 
-	ep, err := e.loadEpisode(agentCtx, channelID)
+	ep, err := e.loadEpisode(agentCtx, sessionID)
 	if err != nil {
 		log.Error().Err(err).Msg("engine: failed to load episode")
-		_ = e.ch.SendText(ctx, channelID, "Error: "+err.Error())
+		_ = reply.SendText(ctx, "Error: "+err.Error())
 		return
 	}
 
-	_ = e.ch.SendTyping(ctx, channelID)
-	statusID, _ := e.ch.SendStatus(ctx, channelID, channel.AgentStatus{Phase: channel.PhaseThinking})
+	_ = reply.SendTyping(ctx)
+	statusID, _ := reply.SendStatus(ctx, channel.AgentStatus{Phase: channel.PhaseThinking})
 
-	agentCtx = channel.WithChannel(agentCtx, e.ch, channelID)
+	agentCtx = channel.WithReplier(agentCtx, reply)
 
 	blocks, cleanup := transport2.ProcessAttachments(ep.ID, msg.Text, msg.Attachments)
 	defer cleanup()
@@ -207,56 +208,56 @@ func (e *Engine) runAgent(ctx context.Context, channelID string, msg channel.Mes
 	go func() {
 		defer bus.Close()
 		if err := e.agent.Run(agentCtx, ep, blocks, bus); err != nil {
-			log.Error().Err(err).Str("channel", channelID).Msg("engine: agent run failed")
+			log.Error().Err(err).Str("session", sessionID).Msg("engine: agent run failed")
 		}
 	}()
 
-	finalText := transport2.ConsumeEvents(agentCtx, e.ch, channelID, recv, statusID)
+	finalText := transport2.ConsumeEvents(agentCtx, reply, recv, statusID)
 	if finalText != "" {
-		_ = e.ch.SendText(ctx, channelID, finalText)
+		_ = reply.SendText(ctx, finalText)
 	}
 }
 
-func (e *Engine) stopAgent(ctx context.Context, channelID string) {
+func (e *Engine) stopAgent(sessionID string, cmd *channel.Command) {
 	e.mu.Lock()
-	cancel, running := e.cancels[channelID]
+	cancel, running := e.cancels[sessionID]
 	e.mu.Unlock()
 
 	if !running {
-		_ = e.ch.SendText(ctx, channelID, "Nothing to cancel.")
+		cmd.Result.Data = map[string]string{"text": "Nothing to cancel."}
 		return
 	}
 
 	cancel()
-	_ = e.ch.SendText(ctx, channelID, "⏹ Stopping...")
+	cmd.Result.Data = map[string]string{"text": "⏹ Stopping..."}
 }
 
 // RunScheduledTask executes a scheduled task in the active episode for the
-// given channel. It runs synchronously and returns the agent's text output.
-// If the agent is already busy on this channel, it returns an error so the
+// given session. It runs synchronously and returns the agent's text output.
+// If the agent is already busy on this session, it returns an error so the
 // scheduler can apply backoff and retry later.
-func (e *Engine) RunScheduledTask(ctx context.Context, channelID, taskID, command, skill string) (string, error) {
+func (e *Engine) RunScheduledTask(ctx context.Context, sessionID string, reply channel.Replier, taskID, command, skill string) (string, error) {
 	e.mu.Lock()
-	_, busy := e.cancels[channelID]
+	_, busy := e.cancels[sessionID]
 	e.mu.Unlock()
 	if busy {
-		return "", fmt.Errorf("agent busy on channel %s, will retry", channelID)
+		return "", fmt.Errorf("agent busy on session %s, will retry", sessionID)
 	}
 
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	agentCtx = channel.WithChannel(agentCtx, e.ch, channelID)
+	agentCtx = channel.WithReplier(agentCtx, reply)
 
 	e.mu.Lock()
-	e.cancels[channelID] = cancel
+	e.cancels[sessionID] = cancel
 	e.mu.Unlock()
 	defer func() {
 		e.mu.Lock()
-		delete(e.cancels, channelID)
+		delete(e.cancels, sessionID)
 		e.mu.Unlock()
 	}()
 
-	ep, err := e.loadEpisode(agentCtx, channelID)
+	ep, err := e.loadEpisode(agentCtx, sessionID)
 	if err != nil {
 		return "", fmt.Errorf("load episode: %w", err)
 	}
@@ -288,21 +289,21 @@ func (e *Engine) RunScheduledTask(ctx context.Context, channelID, taskID, comman
 	}
 
 	if finalText != "" {
-		_ = e.ch.SendText(ctx, channelID, finalText)
+		_ = reply.SendText(ctx, finalText)
 	}
 
 	return finalText, nil
 }
 
-func (e *Engine) loadEpisode(ctx context.Context, channelID string) (*store2.Episode, error) {
-	ep, err := e.store.LoadOrCreateActiveEpisode(channelID)
+func (e *Engine) loadEpisode(ctx context.Context, sessionID string) (*store2.Episode, error) {
+	ep, err := e.store.LoadOrCreateActiveEpisode(sessionID)
 	if err != nil {
 		return nil, err
 	}
 
 	if ep.HasMessages() && time.Since(ep.UpdatedAt) > e.episodeGap {
 		log.Info().
-			Str("channel", channelID).
+			Str("session", sessionID).
 			Str("episode", ep.ID).
 			Dur("gap", time.Since(ep.UpdatedAt)).
 			Msg("engine: closing stale episode")
@@ -311,11 +312,11 @@ func (e *Engine) loadEpisode(ctx context.Context, channelID string) (*store2.Epi
 			log.Error().Err(err).Msg("engine: failed to close episode, continuing with new")
 		}
 
-		ep = e.store.NewEpisode(channelID)
+		ep = e.store.NewEpisode(sessionID)
 		if err := ep.Save(); err != nil {
 			return nil, err
 		}
-		if err := e.store.SetActiveEpisodeMapping(channelID, ep.ID); err != nil {
+		if err := e.store.SetActiveEpisodeMapping(sessionID, ep.ID); err != nil {
 			return nil, err
 		}
 	}
@@ -327,8 +328,8 @@ func (e *Engine) loadEpisode(ctx context.Context, channelID string) (*store2.Epi
 	return ep, nil
 }
 
-func (e *Engine) resetEpisode(ctx context.Context, channelID string) error {
-	ep, err := e.store.LoadOrCreateActiveEpisode(channelID)
+func (e *Engine) resetEpisode(ctx context.Context, sessionID string) error {
+	ep, err := e.store.LoadOrCreateActiveEpisode(sessionID)
 	if err != nil {
 		return err
 	}
@@ -339,11 +340,11 @@ func (e *Engine) resetEpisode(ctx context.Context, channelID string) error {
 		}
 	}
 
-	newEp := e.store.NewEpisode(channelID)
+	newEp := e.store.NewEpisode(sessionID)
 	if err := newEp.Save(); err != nil {
 		return err
 	}
-	return e.store.SetActiveEpisodeMapping(channelID, newEp.ID)
+	return e.store.SetActiveEpisodeMapping(sessionID, newEp.ID)
 }
 
 type episodeSummaryResult struct {

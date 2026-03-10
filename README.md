@@ -163,7 +163,7 @@ Everything else — memory, scheduling, compaction, identity — is just tools t
 GoGogot is designed to be extended without frameworks or plugin registries:
 
 - Adding a new LLM backend (implement one `Backend` interface method)
-- Adding a new transport like Discord or Slack (implement 3 `Transport` methods)
+- Adding a new transport like Discord or Slack (implement `Channel` + `Replier` — 3 + 6 methods)
 - Adding custom models by editing JSON catalogs in [`llm/catalog/`](internal/llm/catalog/)
 
 ## License
