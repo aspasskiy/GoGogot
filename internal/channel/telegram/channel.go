@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gogogot/internal/channel"
 	"gogogot/internal/channel/telegram/client"
+	"gogogot/internal/core/transport"
 	"strings"
 	"sync"
 	"time"
@@ -51,7 +52,7 @@ type replier struct {
 func (t *Channel) Name() string   { return "telegram" }
 func (t *Channel) OwnerID() int64 { return t.ownerID }
 
-func (t *Channel) OwnerSession() (string, channel.Replier) {
+func (t *Channel) OwnerSession() (string, transport.Replier) {
 	return fmt.Sprintf("%s%d", channelPrefix, t.ownerID), t.newReplier(t.ownerID)
 }
 
@@ -76,6 +77,11 @@ func (t *Channel) Run(ctx context.Context, handler channel.Handler) error {
 }
 
 func (t *Channel) defaultHandler(ctx context.Context, update *models.Update) {
+	if update.CallbackQuery != nil {
+		t.handleCallback(ctx, update.CallbackQuery)
+		return
+	}
+
 	if update.Message == nil {
 		return
 	}
@@ -90,6 +96,26 @@ func (t *Channel) defaultHandler(ctx context.Context, update *models.Update) {
 	} else {
 		t.convertAndDispatch(ctx, []*models.Message{msg})
 	}
+}
+
+func (t *Channel) handleCallback(ctx context.Context, cb *models.CallbackQuery) {
+	if cb.From.ID != t.ownerID {
+		return
+	}
+	_ = t.client.AnswerCallbackQuery(ctx, cb.ID)
+
+	var chatID int64
+	if cb.Message.Message != nil {
+		chatID = cb.Message.Message.Chat.ID
+	} else {
+		chatID = cb.From.ID
+	}
+	sessionID := fmt.Sprintf("%s%d", channelPrefix, chatID)
+	t.handler(ctx, channel.Message{
+		SessionID: sessionID,
+		Text:      cb.Data,
+		Reply:     t.newReplier(chatID),
+	})
 }
 
 func (t *Channel) handleMediaGroup(ctx context.Context, msg *models.Message) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gogogot/internal/channel"
+	"gogogot/internal/core/transport"
 	"strings"
 
 	"github.com/go-telegram/bot/models"
@@ -12,55 +13,55 @@ import (
 
 type mediaExtractor struct {
 	check   func(*models.Message) bool
-	process func(t *Channel, ctx context.Context, msg *models.Message) ([]channel.Attachment, error)
+	process func(t *Channel, ctx context.Context, msg *models.Message) ([]transport.Attachment, error)
 }
 
 var mediaExtractors = []mediaExtractor{
 	{
 		check: func(m *models.Message) bool { return m.Animation != nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processAnimation(ctx, m.Animation)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return m.Document != nil && m.Animation == nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processDocument(ctx, m.Document)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return len(m.Photo) > 0 },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processPhoto(ctx, m.Photo)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return m.Audio != nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processAudio(ctx, m.Audio)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return m.Voice != nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processVoice(ctx, m.Voice)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return m.Video != nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processVideo(ctx, m.Video)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return m.VideoNote != nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processVideoNote(ctx, m.VideoNote)
 		},
 	},
 	{
 		check: func(m *models.Message) bool { return m.Sticker != nil },
-		process: func(t *Channel, ctx context.Context, m *models.Message) ([]channel.Attachment, error) {
+		process: func(t *Channel, ctx context.Context, m *models.Message) ([]transport.Attachment, error) {
 			return t.processSticker(ctx, m.Sticker)
 		},
 	},
@@ -75,7 +76,7 @@ func (t *Channel) convertAndDispatch(ctx context.Context, msgs []*models.Message
 	sessionID := fmt.Sprintf("%s%d", channelPrefix, chatID)
 	reply := t.newReplier(chatID)
 	var textParts []string
-	var attachments []channel.Attachment
+	var attachments []transport.Attachment
 
 	for _, msg := range msgs {
 		text := strings.TrimSpace(msg.Text)

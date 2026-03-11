@@ -4,6 +4,8 @@ import (
 	"context"
 	"gogogot/internal/channel"
 	"gogogot/internal/channel/telegram/client"
+	"gogogot/internal/core/transport"
+	"gogogot/internal/tools/store"
 )
 
 var commandMap = map[string]string{
@@ -23,7 +25,7 @@ var commandEmpty = map[string]string{
 	channel.CmdMemory:  "Memory is empty — no files yet.",
 }
 
-func (t *Channel) handleCommand(ctx context.Context, chatID int64, sessionID string, reply channel.Replier, cmdText string) {
+func (t *Channel) handleCommand(ctx context.Context, chatID int64, sessionID string, reply transport.Replier, cmdText string) {
 	if cmdText == "/help" {
 		t.send(ctx, chatID, "*Commands:*\n"+
 			"/new — start a fresh conversation\n"+
@@ -48,6 +50,11 @@ func (t *Channel) handleCommand(ctx context.Context, chatID int64, sessionID str
 		return
 	}
 
+	if text := formatPayload(cmd.Result.Payload); text != "" {
+		t.sendLong(ctx, chatID, text)
+		return
+	}
+
 	if text := cmd.Result.Data["text"]; text != "" {
 		t.sendLong(ctx, chatID, text)
 		return
@@ -60,5 +67,16 @@ func (t *Channel) handleCommand(ctx context.Context, chatID int64, sessionID str
 
 	if msg, ok := commandEmpty[name]; ok {
 		t.sendLong(ctx, chatID, msg)
+	}
+}
+
+func formatPayload(payload any) string {
+	switch v := payload.(type) {
+	case []store.EpisodeInfo:
+		return FormatHistory(v)
+	case []store.MemoryFile:
+		return FormatMemory(v)
+	default:
+		return ""
 	}
 }

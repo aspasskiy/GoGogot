@@ -5,10 +5,10 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/aspasskiy/GoGogot?style=flat-square)](https://go.dev)
 [![License](https://img.shields.io/github/license/aspasskiy/GoGogot?style=flat-square)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/aspasskiy/GoGogot?style=flat-square)](https://github.com/aspasskiy/GoGogot/stargazers)
-[![Lines of code](https://img.shields.io/badge/lines-~7%2C500-blue?style=flat-square)](#)
+[![Lines of code](https://img.shields.io/badge/core-~5%2C500_lines-blue?style=flat-square)](#)
 [![Docker](https://img.shields.io/docker/pulls/octagonlab/gogogot?style=flat-square)](#quick-start)
 
-A **lightweight, extensible, and secure** open-source AI agent that lives on your server. It runs shell commands, edits files, browses the web, manages persistent memory, and schedules tasks — a self-hosted alternative to OpenClaw (Claude Code) in ~7,500 lines of Go.
+A **lightweight, extensible, and secure** open-source AI agent that lives on your server. It runs shell commands, edits files, browses the web, manages persistent memory, and schedules tasks — a self-hosted alternative to OpenClaw (Claude Code) in ~5,500 lines of core Go.
 
 - **Single binary, ~15 MB, ~10 MB RAM** — deploys with one `docker run` command
 - **Your keys stay on your server** — no cloud account, no telemetry, no phoning home

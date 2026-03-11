@@ -3,7 +3,6 @@ package transport
 import (
 	"encoding/base64"
 	"fmt"
-	"gogogot/internal/channel"
 	"gogogot/internal/infra/utils"
 	"gogogot/internal/llm/types"
 	"os"
@@ -14,7 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func ProcessAttachments(chatID, task string, attachments []channel.Attachment) ([]types.ContentBlock, func()) {
+func ProcessAttachments(chatID, task string, attachments []Attachment) ([]types.ContentBlock, func()) {
 	if len(attachments) == 0 {
 		return []types.ContentBlock{types.TextBlock(task)}, func() {}
 	}

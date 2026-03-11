@@ -25,6 +25,7 @@ func SystemPrompt(ctx PromptContext) string {
 		buildSafetySection(),
 		buildToolStyleSection(),
 		buildWorkStrategySection(),
+		buildInteractionSection(),
 		buildIdentityToolsSection(),
 		buildMemorySection(),
 		buildRecallSection(),
@@ -209,6 +210,17 @@ func buildRuntimeSection(ctx PromptContext) string {
 	now := time.Now().In(loc)
 	parts = append(parts, "time="+now.Format("2006-01-02 15:04 MST"))
 	return "RUNTIME: " + strings.Join(parts, " | ")
+}
+
+func buildInteractionSection() string {
+	return `USER INTERACTION: You have tools to communicate with the user during long tasks:
+- report_status(text, percent?) — update the visible status indicator. Use during multi-step work to show what you're doing. Example: report_status(text="Analyzing Russian market data...")
+- send_message(text, level?) — send an intermediate message without ending your task. Levels: "info" (default), "success", "warning". Use to share findings or progress. Example: send_message(text="Found: 7/10 top RU apps are VPNs", level="info")
+- ask_user(question, kind?, options?) — ask the user and wait for a response. Kinds: "freeform" (default, open text), "confirm" (yes/no), "choice" (pick from options). Examples:
+  ask_user(question="Delete old files?", kind="confirm")
+  ask_user(question="Which source?", kind="choice", options=[{value:"habr", label:"Habr"}, {value:"vc", label:"VC.ru"}])
+WHEN TO ASK: Always ask before destructive actions (deleting files, overwriting configs). Ask when you are genuinely uncertain — do not guess. For routine work, just do it.
+WHEN TO REPORT: For tasks with 3+ steps, use task_plan to track progress (the user sees it automatically). Use report_status for ad-hoc status when not using task_plan. Use send_message sparingly — only for genuinely useful findings.`
 }
 
 func buildAutonomySection() string {

@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"gogogot/internal/channel"
 	"gogogot/internal/tools/types"
 )
 
@@ -28,7 +27,7 @@ func ChannelTools() []types.Tool {
 }
 
 func sendFileHandler(ctx context.Context, input map[string]any) types.Result {
-	reply, ok := channel.ReplierFromContext(ctx)
+	reply, ok := ReplierFromContext(ctx)
 	if !ok {
 		return types.Result{Output: "error: no replier in context", IsErr: true}
 	}

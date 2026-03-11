@@ -1,4 +1,4 @@
-package event
+package transport
 
 import (
 	"gogogot/internal/tools/store"
@@ -17,6 +17,10 @@ const (
 	LoopWarning Kind = "loop_warning"
 	Error       Kind = "error"
 	Done        Kind = "done"
+
+	Progress Kind = "progress"
+	Message  Kind = "message"
+	Ask      Kind = "ask"
 )
 
 type Event struct {
@@ -60,4 +64,22 @@ type CompactionData struct {
 type LoopWarningData struct {
 	Name   string
 	Reason string
+}
+
+type ProgressData struct {
+	Tasks   []PlanTask
+	Status  string
+	Percent *int
+}
+
+type MessageData struct {
+	Text  string
+	Level MessageLevel
+}
+
+type AskData struct {
+	Prompt  string
+	Kind    AskKind
+	Options []AskOption
+	ReplyCh chan<- string
 }

@@ -7,14 +7,14 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
-	"gogogot/internal/channel"
+	"gogogot/internal/core/transport"
 	"io"
 	"strings"
 
 	"github.com/go-telegram/bot/models"
 )
 
-func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]channel.Attachment, error) {
+func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]transport.Attachment, error) {
 	mime := doc.MimeType
 
 	if mime == "application/zip" || mime == "application/x-zip-compressed" || strings.HasSuffix(strings.ToLower(doc.FileName), ".zip") {
@@ -47,7 +47,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 		if err != nil {
 			return nil, err
 		}
-		return []channel.Attachment{{Filename: doc.FileName, MimeType: mime, Data: data}}, nil
+		return []transport.Attachment{{Filename: doc.FileName, MimeType: mime, Data: data}}, nil
 	}
 
 	if isTextMIME(mime) || mime == "" || mime == "application/octet-stream" {
@@ -58,7 +58,7 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 		if err != nil {
 			return nil, err
 		}
-		return []channel.Attachment{{Filename: doc.FileName, MimeType: "text/plain", Data: data}}, nil
+		return []transport.Attachment{{Filename: doc.FileName, MimeType: "text/plain", Data: data}}, nil
 	}
 
 	if doc.FileSize > maxGenericFileSize {
@@ -68,10 +68,10 @@ func (t *Channel) processDocument(ctx context.Context, doc *models.Document) ([]
 	if err != nil {
 		return nil, err
 	}
-	return []channel.Attachment{{Filename: doc.FileName, MimeType: mime, Data: data}}, nil
+	return []transport.Attachment{{Filename: doc.FileName, MimeType: mime, Data: data}}, nil
 }
 
-func (t *Channel) processPhoto(ctx context.Context, photos []models.PhotoSize) ([]channel.Attachment, error) {
+func (t *Channel) processPhoto(ctx context.Context, photos []models.PhotoSize) ([]transport.Attachment, error) {
 	if len(photos) == 0 {
 		return nil, nil
 	}
@@ -83,10 +83,10 @@ func (t *Channel) processPhoto(ctx context.Context, photos []models.PhotoSize) (
 	if err != nil {
 		return nil, err
 	}
-	return []channel.Attachment{{Filename: "photo.jpg", MimeType: "image/jpeg", Data: data}}, nil
+	return []transport.Attachment{{Filename: "photo.jpg", MimeType: "image/jpeg", Data: data}}, nil
 }
 
-func (t *Channel) processAudio(ctx context.Context, audio *models.Audio) ([]channel.Attachment, error) {
+func (t *Channel) processAudio(ctx context.Context, audio *models.Audio) ([]transport.Attachment, error) {
 	if audio.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("audio too large (%d bytes)", audio.FileSize)
 	}
@@ -102,10 +102,10 @@ func (t *Channel) processAudio(ctx context.Context, audio *models.Audio) ([]chan
 	if mime == "" {
 		mime = "audio/mpeg"
 	}
-	return []channel.Attachment{{Filename: filename, MimeType: mime, Data: data}}, nil
+	return []transport.Attachment{{Filename: filename, MimeType: mime, Data: data}}, nil
 }
 
-func (t *Channel) processVoice(ctx context.Context, voice *models.Voice) ([]channel.Attachment, error) {
+func (t *Channel) processVoice(ctx context.Context, voice *models.Voice) ([]transport.Attachment, error) {
 	if voice.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("voice too large (%d bytes)", voice.FileSize)
 	}
@@ -117,10 +117,10 @@ func (t *Channel) processVoice(ctx context.Context, voice *models.Voice) ([]chan
 	if mime == "" {
 		mime = "audio/ogg"
 	}
-	return []channel.Attachment{{Filename: "voice.ogg", MimeType: mime, Data: data}}, nil
+	return []transport.Attachment{{Filename: "voice.ogg", MimeType: mime, Data: data}}, nil
 }
 
-func (t *Channel) processVideo(ctx context.Context, video *models.Video) ([]channel.Attachment, error) {
+func (t *Channel) processVideo(ctx context.Context, video *models.Video) ([]transport.Attachment, error) {
 	if video.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("video too large (%d bytes)", video.FileSize)
 	}
@@ -136,10 +136,10 @@ func (t *Channel) processVideo(ctx context.Context, video *models.Video) ([]chan
 	if filename == "" {
 		filename = "video.mp4"
 	}
-	return []channel.Attachment{{Filename: filename, MimeType: mime, Data: data}}, nil
+	return []transport.Attachment{{Filename: filename, MimeType: mime, Data: data}}, nil
 }
 
-func (t *Channel) processVideoNote(ctx context.Context, vn *models.VideoNote) ([]channel.Attachment, error) {
+func (t *Channel) processVideoNote(ctx context.Context, vn *models.VideoNote) ([]transport.Attachment, error) {
 	if vn.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("video note too large (%d bytes)", vn.FileSize)
 	}
@@ -147,10 +147,10 @@ func (t *Channel) processVideoNote(ctx context.Context, vn *models.VideoNote) ([
 	if err != nil {
 		return nil, err
 	}
-	return []channel.Attachment{{Filename: "videonote.mp4", MimeType: "video/mp4", Data: data}}, nil
+	return []transport.Attachment{{Filename: "videonote.mp4", MimeType: "video/mp4", Data: data}}, nil
 }
 
-func (t *Channel) processAnimation(ctx context.Context, anim *models.Animation) ([]channel.Attachment, error) {
+func (t *Channel) processAnimation(ctx context.Context, anim *models.Animation) ([]transport.Attachment, error) {
 	if anim.FileSize > maxGenericFileSize {
 		return nil, fmt.Errorf("animation too large (%d bytes)", anim.FileSize)
 	}
@@ -166,10 +166,10 @@ func (t *Channel) processAnimation(ctx context.Context, anim *models.Animation) 
 	if filename == "" {
 		filename = "animation.mp4"
 	}
-	return []channel.Attachment{{Filename: filename, MimeType: mime, Data: data}}, nil
+	return []transport.Attachment{{Filename: filename, MimeType: mime, Data: data}}, nil
 }
 
-func (t *Channel) processSticker(ctx context.Context, sticker *models.Sticker) ([]channel.Attachment, error) {
+func (t *Channel) processSticker(ctx context.Context, sticker *models.Sticker) ([]transport.Attachment, error) {
 	if sticker.IsAnimated {
 		return nil, nil
 	}
@@ -180,7 +180,7 @@ func (t *Channel) processSticker(ctx context.Context, sticker *models.Sticker) (
 	if err != nil {
 		return nil, err
 	}
-	return []channel.Attachment{{Filename: "sticker.webp", MimeType: "image/webp", Data: data}}, nil
+	return []transport.Attachment{{Filename: "sticker.webp", MimeType: "image/webp", Data: data}}, nil
 }
 
 func isTextMIME(mime string) bool {
@@ -208,13 +208,13 @@ func shouldIncludeArchiveEntry(name string) (isText, isImage bool) {
 	return isTextExtension(lower), isImageExtension(lower)
 }
 
-func extractZipFiles(data []byte) ([]channel.Attachment, error) {
+func extractZipFiles(data []byte) ([]transport.Attachment, error) {
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read zip: %w", err)
 	}
 
-	var attachments []channel.Attachment
+	var attachments []transport.Attachment
 	for _, file := range reader.File {
 		if file.FileInfo().IsDir() {
 			continue
@@ -240,7 +240,7 @@ func extractZipFiles(data []byte) ([]channel.Attachment, error) {
 			continue
 		}
 
-		attachments = append(attachments, channel.Attachment{
+		attachments = append(attachments, transport.Attachment{
 			Filename: file.Name,
 			MimeType: mimeFromExtension(strings.ToLower(file.Name), isImage),
 			Data:     content,
@@ -253,7 +253,7 @@ func extractZipFiles(data []byte) ([]channel.Attachment, error) {
 	return attachments, nil
 }
 
-func extractTarGzFiles(data []byte) ([]channel.Attachment, error) {
+func extractTarGzFiles(data []byte) ([]transport.Attachment, error) {
 	gzr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read gzip: %w", err)
@@ -261,7 +261,7 @@ func extractTarGzFiles(data []byte) ([]channel.Attachment, error) {
 	defer gzr.Close()
 
 	tr := tar.NewReader(gzr)
-	var attachments []channel.Attachment
+	var attachments []transport.Attachment
 
 	for {
 		header, err := tr.Next()
@@ -291,7 +291,7 @@ func extractTarGzFiles(data []byte) ([]channel.Attachment, error) {
 			continue
 		}
 
-		attachments = append(attachments, channel.Attachment{
+		attachments = append(attachments, transport.Attachment{
 			Filename: header.Name,
 			MimeType: mimeFromExtension(strings.ToLower(header.Name), isImage),
 			Data:     content,

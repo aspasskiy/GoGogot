@@ -3,6 +3,7 @@ package system
 import (
 	"context"
 	"fmt"
+	"gogogot/internal/core/transport"
 	"gogogot/internal/tools/types"
 	"strings"
 	"sync"
@@ -130,6 +131,24 @@ func (tp *TaskPlan) deleteAll() types.Result {
 	tp.tasks = nil
 	tp.nextID = 1
 	return types.Result{Output: "Task list cleared."}
+}
+
+// Snapshot returns the current task list as transport-level structured data.
+func (tp *TaskPlan) Snapshot() []transport.PlanTask {
+	tp.mu.Lock()
+	defer tp.mu.Unlock()
+
+	if len(tp.tasks) == 0 {
+		return nil
+	}
+	out := make([]transport.PlanTask, len(tp.tasks))
+	for i, t := range tp.tasks {
+		out[i] = transport.PlanTask{
+			Title:  t.Title,
+			Status: transport.TaskStatus(t.Status),
+		}
+	}
+	return out
 }
 
 // TaskPlanTool returns the task_plan tool wired to the given TaskPlan state.

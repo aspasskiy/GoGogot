@@ -61,6 +61,28 @@ func (c *Client) SendDocument(ctx context.Context, chatID int64, document *model
 	return err
 }
 
+func (c *Client) SendMessageWithKeyboard(ctx context.Context, chatID int64, text string, parseMode models.ParseMode, keyboard [][]models.InlineKeyboardButton) (int, error) {
+	sent, err := c.b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID:    chatID,
+		Text:      text,
+		ParseMode: parseMode,
+		ReplyMarkup: &models.InlineKeyboardMarkup{
+			InlineKeyboard: keyboard,
+		},
+	})
+	if err != nil {
+		return 0, err
+	}
+	return sent.ID, nil
+}
+
+func (c *Client) AnswerCallbackQuery(ctx context.Context, callbackQueryID string) error {
+	_, err := c.b.AnswerCallbackQuery(ctx, &bot.AnswerCallbackQueryParams{
+		CallbackQueryID: callbackQueryID,
+	})
+	return err
+}
+
 func (c *Client) SendTyping(ctx context.Context, chatID int64) error {
 	_, err := c.b.SendChatAction(ctx, &bot.SendChatActionParams{
 		ChatID: chatID,

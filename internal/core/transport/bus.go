@@ -1,6 +1,7 @@
-package event
+package transport
 
 import (
+	"context"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -33,6 +34,20 @@ func (b *Bus) Emit(kind Kind, data any) {
 	}:
 	default:
 		log.Warn().Any("kind", kind).Msg("event dropped — bus full")
+	}
+}
+
+// EmitBlocking sends an event, blocking until it is delivered or the context
+// is cancelled. Use for events that must not be dropped (e.g. Ask).
+func (b *Bus) EmitBlocking(ctx context.Context, kind Kind, data any) error {
+	if b == nil || b.ch == nil {
+		return context.Canceled
+	}
+	select {
+	case b.ch <- Event{Timestamp: time.Now(), Kind: kind, Data: data}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
 	}
 }
 

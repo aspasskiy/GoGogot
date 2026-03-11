@@ -2,9 +2,9 @@ package agent
 
 import (
 	"context"
-	"gogogot/internal/core/agent/event"
 	"gogogot/internal/core/agent/hook"
 	"gogogot/internal/core/prompt"
+	"gogogot/internal/core/transport"
 	"gogogot/internal/llm"
 	llmTypes "gogogot/internal/llm/types"
 	"gogogot/internal/tools"
@@ -25,10 +25,11 @@ type Agent struct {
 	config       Config
 	registry     *tools.Registry
 	localTools   map[string]toolTypes.Tool
+	taskPlan     *system.TaskPlan
 	loopDetector *hook.LoopDetector
 	beforeHooks  []hook.BeforeIterationFunc
 	afterHooks   []hook.AfterIterationFunc
-	bus          *event.Bus
+	bus          *transport.Bus
 }
 
 func New(client llm.LLM, config Config, registry *tools.Registry) *Agent {
@@ -39,8 +40,12 @@ func New(client llm.LLM, config Config, registry *tools.Registry) *Agent {
 		client:   client,
 		config:   config,
 		registry: registry,
+		taskPlan: tp,
 		localTools: map[string]toolTypes.Tool{
-			tpTool.Name: tpTool,
+			tpTool.Name:       tpTool,
+			"report_status":   reportStatusTool(),
+			"send_message":    sendMessageTool(),
+			"ask_user":        askUserTool(),
 		},
 	}
 
@@ -121,4 +126,73 @@ func (a *Agent) executeTool(ctx context.Context, name string, input map[string]a
 		return result
 	}
 	return a.registry.Execute(ctx, name, input)
+}
+
+func reportStatusTool() toolTypes.Tool {
+	return toolTypes.Tool{
+		Name:        "report_status",
+		Description: "Update the visible status shown to the user. Use during long tasks to communicate what you are working on.",
+		Parameters: map[string]any{
+			"text": map[string]any{
+				"type":        "string",
+				"description": "Short status text, e.g. 'Analyzing Russian market data...'",
+			},
+			"percent": map[string]any{
+				"type":        "integer",
+				"description": "Optional progress percentage 0-100 for measurable operations",
+			},
+		},
+		Required: []string{"text"},
+		Handler: func(_ context.Context, _ map[string]any) toolTypes.Result {
+			return toolTypes.Result{Output: "status updated"}
+		},
+	}
+}
+
+func sendMessageTool() toolTypes.Tool {
+	return toolTypes.Tool{
+		Name:        "send_message",
+		Description: "Send an intermediate message to the user without ending your current task. Use to share findings, progress updates, or important information mid-run.",
+		Parameters: map[string]any{
+			"text": map[string]any{
+				"type":        "string",
+				"description": "Message text to send",
+			},
+			"level": map[string]any{
+				"type":        "string",
+				"enum":        []string{"info", "success", "warning"},
+				"description": "Optional message level: info (default), success, or warning",
+			},
+		},
+		Required: []string{"text"},
+		Handler: func(_ context.Context, _ map[string]any) toolTypes.Result {
+			return toolTypes.Result{Output: "message sent"}
+		},
+	}
+}
+
+func askUserTool() toolTypes.Tool {
+	return toolTypes.Tool{
+		Name:        "ask_user",
+		Description: "Ask the user a question and wait for their response. Use for clarification, confirmation, or choices. The agent pauses until the user replies.",
+		Parameters: map[string]any{
+			"question": map[string]any{
+				"type":        "string",
+				"description": "The question to ask",
+			},
+			"kind": map[string]any{
+				"type":        "string",
+				"enum":        []string{"freeform", "confirm", "choice"},
+				"description": "Interaction type: freeform (open text, default), confirm (yes/no), choice (pick from options)",
+			},
+			"options": map[string]any{
+				"type":        "array",
+				"description": "For 'choice' kind: array of {value, label} objects",
+			},
+		},
+		Required: []string{"question"},
+		Handler: func(_ context.Context, _ map[string]any) toolTypes.Result {
+			return toolTypes.Result{Output: "ok"}
+		},
+	}
 }

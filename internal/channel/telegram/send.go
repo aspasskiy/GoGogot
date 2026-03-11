@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"gogogot/internal/channel/telegram/format"
+	"gogogot/internal/core/transport"
 	"gogogot/internal/infra/utils"
 	"os"
 	"strings"
@@ -40,6 +41,34 @@ func (r *replier) SendFile(ctx context.Context, path, caption string) error {
 		return r.ch.client.SendAnimation(ctx, r.chatID, upload, caption)
 	default:
 		return r.ch.client.SendDocument(ctx, r.chatID, upload, caption)
+	}
+}
+
+func (r *replier) SendAsk(ctx context.Context, prompt string, kind transport.AskKind, options []transport.AskOption) error {
+	text := "❓ " + prompt
+
+	switch kind {
+	case transport.AskConfirm:
+		keyboard := [][]models.InlineKeyboardButton{{
+			{Text: "✅ Yes", CallbackData: "yes"},
+			{Text: "❌ No", CallbackData: "no"},
+		}}
+		_, err := r.ch.client.SendMessageWithKeyboard(ctx, r.chatID, text, "", keyboard)
+		return err
+
+	case transport.AskChoice:
+		var rows [][]models.InlineKeyboardButton
+		for _, opt := range options {
+			rows = append(rows, []models.InlineKeyboardButton{
+				{Text: opt.Label, CallbackData: opt.Value},
+			})
+		}
+		_, err := r.ch.client.SendMessageWithKeyboard(ctx, r.chatID, text, "", rows)
+		return err
+
+	default:
+		r.ch.sendLong(ctx, r.chatID, text)
+		return nil
 	}
 }
 
