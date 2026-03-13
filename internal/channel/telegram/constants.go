@@ -1,7 +1,6 @@
 package telegram
 
 const (
-	channelPrefix = "tg_"
 	maxMessageLen = 4000
 
 	maxTextFileSize    = 512 * 1024

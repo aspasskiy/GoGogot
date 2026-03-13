@@ -48,11 +48,9 @@ func (c *Channel) handleCallback(ctx context.Context, cb *models.CallbackQuery) 
 	} else {
 		chatID = cb.From.ID
 	}
-	sid := sessionID(chatID)
 	c.handler(ctx, channel.Message{
-		SessionID: sid,
-		Text:      cb.Data,
-		Reply:     c.newReplier(chatID),
+		Text:  cb.Data,
+		Reply: c.newReplier(chatID),
 	})
 }
 

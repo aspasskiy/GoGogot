@@ -19,9 +19,9 @@ func NewManager(st store.Store, client llm.LLM) *Manager {
 	return &Manager{store: st, llm: client}
 }
 
-// Resolve returns the active episode for the session. If the user's message
-// starts a new topic, the current episode is closed and a fresh one is created.
-func (m *Manager) Resolve(ctx context.Context, sessionID, userMessage string) (*store.Episode, error) {
+// Resolve returns the active episode. If the user's message starts a new topic,
+// the current episode is closed and a fresh one is created.
+func (m *Manager) Resolve(ctx context.Context, userMessage string) (*store.Episode, error) {
 	ep, err := m.loadOrCreateActiveEpisode()
 	if err != nil {
 		return nil, err
@@ -35,7 +35,6 @@ func (m *Manager) Resolve(ctx context.Context, sessionID, userMessage string) (*
 			log.Warn().Err(err).Msg("episode: classification failed, continuing current episode")
 		} else if decision == decisionNew {
 			log.Info().
-				Str("session", sessionID).
 				Str("old_episode", ep.ID).
 				Msg("episode: new topic detected, rotating episode")
 
@@ -59,7 +58,7 @@ func (m *Manager) Resolve(ctx context.Context, sessionID, userMessage string) (*
 }
 
 // Reset force-closes the current episode and creates a new one (e.g. /new command).
-func (m *Manager) Reset(ctx context.Context, sessionID string) error {
+func (m *Manager) Reset(ctx context.Context) error {
 	ep, err := m.loadOrCreateActiveEpisode()
 	if err != nil {
 		return err

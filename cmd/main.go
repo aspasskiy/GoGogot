@@ -63,7 +63,7 @@ func notifyOwnerAndBlock(ch channel.Channel, providerErr error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	_, reply := ch.OwnerSession()
+	reply := ch.OwnerReplier()
 	msg := fmt.Sprintf("⚠️ Failed to start:\n\n%v\n\nFix environment variables and restart the container.", providerErr)
 	_ = reply.SendText(ctx, msg)
 

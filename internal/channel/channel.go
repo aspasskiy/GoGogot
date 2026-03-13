@@ -25,7 +25,6 @@ type CommandResult struct {
 }
 
 type Message struct {
-	SessionID   string
 	Text        string
 	Attachments []transport.Attachment
 	Command     *Command
@@ -37,6 +36,6 @@ type Handler func(ctx context.Context, msg Message)
 // Channel is the interface every communication channel must implement.
 type Channel interface {
 	Name() string
-	OwnerSession() (sessionID string, reply transport.Replier)
+	OwnerReplier() transport.Replier
 	Run(ctx context.Context, handler Handler) error
 }

@@ -30,7 +30,7 @@ func main() {
 	}
 
 	ctx := context.Background()
-	_, reply := ch.OwnerSession()
+	reply := ch.OwnerReplier()
 
 	scenarioProgress(ctx, reply)
 

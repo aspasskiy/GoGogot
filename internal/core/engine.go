@@ -30,8 +30,8 @@ type Engine struct {
 	scheduler *scheduler.Scheduler
 	registry  *tools.Registry
 
-	mu       sync.Mutex
-	sessions map[string]*activeSession
+	mu     sync.Mutex
+	active *activeSession
 }
 
 type Params struct {
@@ -51,12 +51,11 @@ func New(p Params) *Engine {
 		episodes:  p.Episodes,
 		scheduler: p.Scheduler,
 		registry:  p.Registry,
-		sessions:  make(map[string]*activeSession),
 	}
 
-	ownerSessionID, ownerReply := p.Channel.OwnerSession()
+	ownerReply := p.Channel.OwnerReplier()
 	p.Scheduler.SetExecutor(func(ctx context.Context, taskID, command, skill string) (string, error) {
-		return eng.RunScheduledTask(ctx, ownerSessionID, ownerReply, taskID, command, skill)
+		return eng.RunScheduledTask(ctx, ownerReply, taskID, command, skill)
 	})
 
 	return eng
@@ -82,10 +81,10 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 	}
 
 	e.mu.Lock()
-	sess, busy := e.sessions[msg.SessionID]
+	sess := e.active
 	e.mu.Unlock()
 
-	if busy {
+	if sess != nil {
 		select {
 		case sess.replyInbox <- msg.Text:
 			return
@@ -100,7 +99,6 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 	}
 
 	log.Info().
-		Str("session", msg.SessionID).
 		Int("text_len", len(msg.Text)).
 		Int("attachments", len(msg.Attachments)).
 		Msg("engine: incoming message")
@@ -112,9 +110,9 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	cmd := msg.Command
 	switch cmd.Name {
 	case channel.CmdNewEpisode:
-		cmd.Result.Error = e.episodes.Reset(ctx, msg.SessionID)
+		cmd.Result.Error = e.episodes.Reset(ctx)
 	case channel.CmdStop:
-		e.stopAgent(msg.SessionID, cmd)
+		e.stopAgent(cmd)
 	case channel.CmdHistory:
 		episodes, err := e.store.ListEpisodes()
 		if err != nil {
@@ -132,22 +130,21 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	}
 }
 
-// acquireSession registers a session and returns a release function that
-// removes it. Caller must defer the release.
-func (e *Engine) acquireSession(sessionID string, sess *activeSession) func() {
+// setActive marks the engine as busy and returns a release function.
+// Caller must defer the release.
+func (e *Engine) setActive(sess *activeSession) func() {
 	e.mu.Lock()
-	e.sessions[sessionID] = sess
+	e.active = sess
 	e.mu.Unlock()
 	return func() {
 		e.mu.Lock()
-		delete(e.sessions, sessionID)
+		e.active = nil
 		e.mu.Unlock()
 	}
 }
 
 func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 	reply := msg.Reply
-	sessionID := msg.SessionID
 
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -156,9 +153,9 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 		cancel:     cancel,
 		replyInbox: make(chan string),
 	}
-	defer e.acquireSession(sessionID, sess)()
+	defer e.setActive(sess)()
 
-	ep, err := e.episodes.Resolve(agentCtx, sessionID, msg.Text)
+	ep, err := e.episodes.Resolve(agentCtx, msg.Text)
 	if err != nil {
 		log.Error().Err(err).Msg("engine: failed to resolve episode")
 		_ = reply.SendText(ctx, "Error: "+err.Error())
@@ -174,7 +171,7 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 	go func() {
 		defer bus.Close()
 		if err := e.agent.Run(agentCtx, ep, blocks, bus); err != nil {
-			log.Error().Err(err).Str("session", sessionID).Msg("engine: agent run failed")
+			log.Error().Err(err).Msg("engine: agent run failed")
 		}
 	}()
 
@@ -184,12 +181,12 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 	}
 }
 
-func (e *Engine) stopAgent(sessionID string, cmd *channel.Command) {
+func (e *Engine) stopAgent(cmd *channel.Command) {
 	e.mu.Lock()
-	sess, running := e.sessions[sessionID]
+	sess := e.active
 	e.mu.Unlock()
 
-	if !running {
+	if sess == nil {
 		cmd.Result.Data = map[string]string{"text": "Nothing to cancel."}
 		return
 	}
@@ -198,16 +195,16 @@ func (e *Engine) stopAgent(sessionID string, cmd *channel.Command) {
 	cmd.Result.Data = map[string]string{"text": "⏹ Stopping..."}
 }
 
-// RunScheduledTask executes a scheduled task in the active episode for the
-// given session. It runs synchronously and returns the agent's text output.
-// If the agent is already busy on this session, it returns an error so the
-// scheduler can apply backoff and retry later.
-func (e *Engine) RunScheduledTask(ctx context.Context, sessionID string, reply transport.Replier, taskID, command, skill string) (string, error) {
+// RunScheduledTask executes a scheduled task in the active episode.
+// It runs synchronously and returns the agent's text output.
+// If the agent is already busy, it returns an error so the scheduler can
+// apply backoff and retry later.
+func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, taskID, command, skill string) (string, error) {
 	e.mu.Lock()
-	_, busy := e.sessions[sessionID]
+	busy := e.active != nil
 	e.mu.Unlock()
 	if busy {
-		return "", fmt.Errorf("agent busy on session %s, will retry", sessionID)
+		return "", fmt.Errorf("agent busy, will retry")
 	}
 
 	agentCtx, cancel := context.WithCancel(ctx)
@@ -215,9 +212,9 @@ func (e *Engine) RunScheduledTask(ctx context.Context, sessionID string, reply t
 	agentCtx = transport.WithReplier(agentCtx, reply)
 
 	sess := &activeSession{cancel: cancel, replyInbox: make(chan string)}
-	defer e.acquireSession(sessionID, sess)()
+	defer e.setActive(sess)()
 
-	ep, err := e.episodes.Resolve(agentCtx, sessionID, command)
+	ep, err := e.episodes.Resolve(agentCtx, command)
 	if err != nil {
 		return "", fmt.Errorf("resolve episode: %w", err)
 	}

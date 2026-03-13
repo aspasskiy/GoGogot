@@ -2,7 +2,6 @@ package telegram
 
 import (
 	"context"
-	"fmt"
 	"gogogot/internal/channel"
 	"gogogot/internal/channel/telegram/client"
 	"gogogot/internal/core/transport"
@@ -40,12 +39,8 @@ func New(token string, ownerID int64) (*Channel, error) {
 func (c *Channel) Name() string   { return "telegram" }
 func (c *Channel) OwnerID() int64 { return c.ownerID }
 
-func (c *Channel) OwnerSession() (string, transport.Replier) {
-	return sessionID(c.ownerID), c.newReplier(c.ownerID)
-}
-
-func sessionID(chatID int64) string {
-	return fmt.Sprintf("%s%d", channelPrefix, chatID)
+func (c *Channel) OwnerReplier() transport.Replier {
+	return c.newReplier(c.ownerID)
 }
 
 func (c *Channel) newReplier(chatID int64) *replier {
