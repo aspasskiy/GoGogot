@@ -21,6 +21,9 @@ const (
 	Progress Kind = "progress"
 	Message  Kind = "message"
 	Ask      Kind = "ask"
+
+	EpisodeClassify  Kind = "episode_classify"
+	EpisodeSummarize Kind = "episode_summarize"
 )
 
 type Event struct {
@@ -84,4 +87,16 @@ type AskData struct {
 	Kind    AskKind
 	Options []AskOption
 	ReplyCh chan<- string
+}
+
+type EpisodeClassifyData struct {
+	Decision     string // "same" or "new"
+	OldEpisodeID string
+	NewEpisodeID string
+}
+
+type EpisodeSummarizeData struct {
+	EpisodeID string
+	Kind      string // "close" or "run_summary"
+	Title     string
 }

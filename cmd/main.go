@@ -10,7 +10,6 @@ import (
 	"gogogot/internal/core/agent/hook"
 	"gogogot/internal/core/episode"
 	"gogogot/internal/core/prompt"
-	"gogogot/internal/core/transport"
 	"gogogot/internal/infra/config"
 	"gogogot/internal/infra/logger"
 	"gogogot/internal/infra/scheduler"
@@ -89,7 +88,7 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 		MaxConcurrent: cfg.Scheduler.MaxConcurrent,
 	})
 
-	extra := append(transport.ChannelTools(),
+	extra := append(tools.ChannelTools(),
 		system.ScheduleTools(sched)...,
 	)
 	extra = append(extra, tools.IdentityTools(st, sched.SetLocation)...)

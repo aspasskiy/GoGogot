@@ -160,11 +160,23 @@ func (r *replier) ConsumeEvents(ctx context.Context, events <-chan transport.Eve
 					Percent: d.Percent,
 				})
 
-			case transport.Message:
-				cancelThinking()
-				d, _ := ev.Data.(transport.MessageData)
-				text := formatMessageWithLevel(d.Text, d.Level)
-				schedule(transport.AgentStatus{Phase: transport.PhaseMessage, Detail: text, Plan: currentPlan})
+			case transport.EpisodeClassify:
+				d, _ := ev.Data.(transport.EpisodeClassifyData)
+				if d.Decision == "new" {
+					schedule(transport.AgentStatus{Phase: transport.PhaseWorking, Detail: "New topic detected"})
+				}
+
+			case transport.EpisodeSummarize:
+				d, _ := ev.Data.(transport.EpisodeSummarizeData)
+				if d.Kind == "close" {
+					schedule(transport.AgentStatus{Phase: transport.PhaseWorking, Detail: "Summarizing previous episode"})
+				}
+
+		case transport.Message:
+			cancelThinking()
+			flush()
+			d, _ := ev.Data.(transport.MessageData)
+			_ = r.SendText(ctx, formatMessageWithLevel(d.Text, d.Level))
 
 			case transport.Ask:
 				flush()

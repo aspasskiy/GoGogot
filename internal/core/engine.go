@@ -155,19 +155,23 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 	}
 	defer e.setActive(run)()
 
-	ep, err := e.episodes.Resolve(agentCtx, msg.Text)
+	bus, recv := transport.NewBus(64)
+
+	res, err := e.episodes.Resolve(agentCtx, msg.Text)
 	if err != nil {
+		bus.Close()
 		log.Error().Err(err).Msg("engine: failed to resolve episode")
 		_ = reply.SendText(ctx, "Error: "+err.Error())
 		return
 	}
+	ep := res.Episode
+	e.emitEpisodeEvents(bus, res)
 
 	agentCtx = transport.WithReplier(agentCtx, reply)
 
 	blocks, cleanup := transport.ProcessAttachments(ep.ID, msg.Text, msg.Attachments)
 	defer cleanup()
 
-	bus, recv := transport.NewBus(64)
 	go func() {
 		defer bus.Close()
 		if err := e.agent.Run(agentCtx, ep, blocks, bus); err != nil {
@@ -195,6 +199,29 @@ func (e *Engine) stopAgent(cmd *channel.Command) {
 	cmd.Result.Data = map[string]string{"text": "⏹ Stopping..."}
 }
 
+func (e *Engine) emitEpisodeEvents(bus *transport.Bus, res *episode.ResolveResult) {
+	if res.Decision != "" {
+		bus.Emit(transport.EpisodeClassify, transport.EpisodeClassifyData{
+			Decision:     res.Decision,
+			OldEpisodeID: res.OldEpisodeID,
+			NewEpisodeID: res.Episode.ID,
+		})
+	}
+	if res.CloseSummarized {
+		bus.Emit(transport.EpisodeSummarize, transport.EpisodeSummarizeData{
+			EpisodeID: res.OldEpisodeID,
+			Kind:      "close",
+			Title:     res.Episode.Title,
+		})
+	}
+	if res.RunSummaryUpdated {
+		bus.Emit(transport.EpisodeSummarize, transport.EpisodeSummarizeData{
+			EpisodeID: res.Episode.ID,
+			Kind:      "run_summary",
+		})
+	}
+}
+
 // RunScheduledTask executes a scheduled task in the active episode.
 // It runs synchronously and returns the agent's text output.
 // If the agent is already busy, it returns an error so the scheduler can
@@ -214,15 +241,19 @@ func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, 
 	run := &activeRun{cancel: cancel, replyInbox: make(chan string)}
 	defer e.setActive(run)()
 
-	ep, err := e.episodes.Resolve(agentCtx, command)
+	bus, recv := transport.NewBus(64)
+
+	res, err := e.episodes.Resolve(agentCtx, command)
 	if err != nil {
+		bus.Close()
 		return "", fmt.Errorf("resolve episode: %w", err)
 	}
+	ep := res.Episode
+	e.emitEpisodeEvents(bus, res)
 
 	promptText := prompt.ScheduledTaskPrompt(taskID, command, skill)
 	blocks := []types.ContentBlock{types.TextBlock(promptText)}
 
-	bus, recv := transport.NewBus(64)
 	var runErr error
 	done := make(chan struct{})
 	go func() {
