@@ -66,33 +66,33 @@ func webFetch(ctx context.Context, input map[string]any) types.Result {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("bad url: %v", err), IsErr: true}
+		return types.Errf("bad url: %v", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; SofieBot/1.0)")
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,text/plain")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("http error: %v", err), IsErr: true}
+		return types.Errf("http error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return types.Result{Output: fmt.Sprintf("HTTP %d for %s", resp.StatusCode, rawURL), IsErr: true}
+		return types.Errf("HTTP %d for %s", resp.StatusCode, rawURL)
 	}
 
 	ct := resp.Header.Get("Content-Type")
 	if strings.Contains(ct, "text/plain") || strings.Contains(ct, "application/json") {
 		body, err := io.ReadAll(io.LimitReader(resp.Body, maxFetchBody))
 		if err != nil {
-			return types.Result{Output: fmt.Sprintf("read body error: %v", err), IsErr: true}
+			return types.Errf("read body error: %v", err)
 		}
-		return truncateResult(string(body))
+		return types.TruncateOutput(string(body))
 	}
 
 	doc, err := goquery.NewDocumentFromReader(io.LimitReader(resp.Body, maxFetchBody))
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("html parse error: %v", err), IsErr: true}
+		return types.Errf("html parse error: %v", err)
 	}
 
 	doc.Find("script, style, noscript, svg").Remove()
@@ -122,7 +122,7 @@ func webFetch(ctx context.Context, input map[string]any) types.Result {
 	if strings.TrimSpace(text) == "" {
 		return types.Result{Output: "(page returned no readable text)"}
 	}
-	return truncateResult(text)
+	return types.TruncateOutput(text)
 }
 
 func extractGoqueryText(s *goquery.Selection) string {
@@ -156,11 +156,4 @@ func extractNodeText(s *goquery.Selection, sb *strings.Builder) {
 	case "p", "div", "li", "h1", "h2", "h3", "h4", "h5", "h6", "tr", "blockquote", "section":
 		sb.WriteString("\n")
 	}
-}
-
-func truncateResult(s string) types.Result {
-	if len(s) > types.MaxOutputSize {
-		return types.Result{Output: s[:types.MaxOutputSize] + "\n... (content truncated)"}
-	}
-	return types.Result{Output: s}
 }

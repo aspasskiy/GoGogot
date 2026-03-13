@@ -16,6 +16,19 @@ func ErrResult(err error) Result {
 	return Result{Output: err.Error(), IsErr: true}
 }
 
+func Errf(format string, args ...any) Result {
+	return Result{Output: fmt.Sprintf(format, args...), IsErr: true}
+}
+
+// TruncateOutput returns a Result whose Output is truncated to MaxOutputSize
+// with a trailing marker when the input exceeds the limit.
+func TruncateOutput(s string) Result {
+	if len(s) > MaxOutputSize {
+		return Result{Output: s[:MaxOutputSize] + "\n... (truncated)"}
+	}
+	return Result{Output: s}
+}
+
 type Handler func(ctx context.Context, input map[string]any) Result
 
 type Tool struct {

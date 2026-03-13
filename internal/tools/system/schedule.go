@@ -56,7 +56,7 @@ func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 				skill := types.GetStringOpt(input, "skill")
 				label := types.GetStringOpt(input, "label")
 				if err := sched.Add(id, schedule, command, skill, label); err != nil {
-					return types.Result{Output: fmt.Sprintf("failed to add schedule: %v", err), IsErr: true}
+					return types.Errf("failed to add schedule: %v", err)
 				}
 				out := fmt.Sprintf("scheduled task %q with cron %q: %s", id, schedule, command)
 				if skill != "" {
@@ -80,7 +80,7 @@ func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 				}
 				data, err := json.MarshalIndent(tasks, "", "  ")
 				if err != nil {
-					return types.Result{Output: fmt.Sprintf("marshal error: %v", err), IsErr: true}
+					return types.Errf("marshal error: %v", err)
 				}
 				return types.Result{Output: string(data)}
 			},
@@ -105,7 +105,7 @@ func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 					return types.ErrResult(err)
 				}
 				if err := sched.Remove(id); err != nil {
-					return types.Result{Output: fmt.Sprintf("failed to remove: %v", err), IsErr: true}
+					return types.Errf("failed to remove: %v", err)
 				}
 				return types.Result{Output: fmt.Sprintf("removed scheduled task %q", id)}
 			},

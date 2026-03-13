@@ -8,6 +8,7 @@ import (
 	"gogogot/internal/llm"
 	"gogogot/internal/llm/types"
 	"gogogot/internal/tools/store"
+	tooltypes "gogogot/internal/tools/types"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -205,7 +206,7 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []types.Conte
 
 func (a *Agent) handleAskUser(ctx context.Context, input map[string]any) (string, error) {
 	question, _ := input["question"].(string)
-	kind := transport.AskKind(getStringOpt(input, "kind"))
+	kind := transport.AskKind(tooltypes.GetStringOpt(input, "kind"))
 	if kind == "" {
 		kind = transport.AskFreeform
 	}
@@ -239,9 +240,4 @@ func (a *Agent) handleAskUser(ctx context.Context, input map[string]any) (string
 	case <-ctx.Done():
 		return "", ctx.Err()
 	}
-}
-
-func getStringOpt(m map[string]any, key string) string {
-	v, _ := m[key].(string)
-	return v
 }

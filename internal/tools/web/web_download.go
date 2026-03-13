@@ -62,34 +62,34 @@ func webDownload(ctx context.Context, input map[string]any) types.Result {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("bad url: %v", err), IsErr: true}
+		return types.Errf("bad url: %v", err)
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; SofieBot/1.0)")
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("http error: %v", err), IsErr: true}
+		return types.Errf("http error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return types.Result{Output: fmt.Sprintf("HTTP %d for %s", resp.StatusCode, rawURL), IsErr: true}
+		return types.Errf("HTTP %d for %s", resp.StatusCode, rawURL)
 	}
 
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-		return types.Result{Output: fmt.Sprintf("mkdir error: %v", err), IsErr: true}
+		return types.Errf("mkdir error: %v", err)
 	}
 
 	f, err := os.Create(dest)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("create file error: %v", err), IsErr: true}
+		return types.Errf("create file error: %v", err)
 	}
 	defer f.Close()
 
 	written, err := io.Copy(f, io.LimitReader(resp.Body, maxDownloadSize))
 	if err != nil {
 		os.Remove(dest)
-		return types.Result{Output: fmt.Sprintf("download error: %v", err), IsErr: true}
+		return types.Errf("download error: %v", err)
 	}
 
 	ct := resp.Header.Get("Content-Type")

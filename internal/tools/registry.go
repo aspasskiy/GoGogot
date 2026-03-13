@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	llmtypes "gogogot/internal/llm/types"
 	"gogogot/internal/tools/store"
 	systemtools "gogogot/internal/tools/system"
@@ -46,7 +45,7 @@ func (r *Registry) Execute(ctx context.Context, name string, input map[string]an
 	t, ok := r.tt[name]
 	if !ok {
 		log.Warn().Str("name", name).Msg("tool dispatch: unknown tool")
-		return types.Result{Output: fmt.Sprintf("unknown tool: %s", name), IsErr: true}
+		return types.Errf("unknown tool: %s", name)
 	}
 	return t.Handler(ctx, input)
 }

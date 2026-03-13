@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"gogogot/internal/tools/types"
 	"os"
-	"path/filepath"
 	"strings"
 )
 
@@ -14,12 +13,7 @@ func EditFileTool() types.Tool {
 		Name:        "edit_file",
 		Label:       "Editing file",
 		Description: "Edit a file by replacing a specific string with a new one. Safer than write_file for modifying configs — only the matched portion changes. Returns error if old_string is not found.",
-		DetailFunc: func(input map[string]any) string {
-			if p, ok := input["path"].(string); ok {
-				return filepath.Base(p)
-			}
-			return ""
-		},
+		DetailFunc: pathDetail,
 		Parameters: map[string]any{
 			"path": map[string]any{
 				"type":        "string",
@@ -60,7 +54,7 @@ func editFile(_ context.Context, input map[string]any) types.Result {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("read error: %v", err), IsErr: true}
+		return types.Errf("read error: %v", err)
 	}
 
 	content := string(data)
@@ -77,7 +71,7 @@ func editFile(_ context.Context, input map[string]any) types.Result {
 	}
 
 	if err := os.WriteFile(path, []byte(updated), 0o644); err != nil {
-		return types.Result{Output: fmt.Sprintf("write error: %v", err), IsErr: true}
+		return types.Errf("write error: %v", err)
 	}
 
 	replaced := count

@@ -194,6 +194,19 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	}
 }
 
+// acquireSession registers a session and returns a release function that
+// removes it. Caller must defer the release.
+func (e *Engine) acquireSession(sessionID string, sess *activeSession) func() {
+	e.mu.Lock()
+	e.sessions[sessionID] = sess
+	e.mu.Unlock()
+	return func() {
+		e.mu.Lock()
+		delete(e.sessions, sessionID)
+		e.mu.Unlock()
+	}
+}
+
 func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 	reply := msg.Reply
 	sessionID := msg.SessionID
@@ -205,14 +218,7 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 		cancel:     cancel,
 		replyInbox: make(chan string),
 	}
-	e.mu.Lock()
-	e.sessions[sessionID] = sess
-	e.mu.Unlock()
-	defer func() {
-		e.mu.Lock()
-		delete(e.sessions, sessionID)
-		e.mu.Unlock()
-	}()
+	defer e.acquireSession(sessionID, sess)()
 
 	ep, err := e.episodes.Resolve(agentCtx, sessionID, msg.Text)
 	if err != nil {
@@ -271,14 +277,7 @@ func (e *Engine) RunScheduledTask(ctx context.Context, sessionID string, reply t
 	agentCtx = transport.WithReplier(agentCtx, reply)
 
 	sess := &activeSession{cancel: cancel, replyInbox: make(chan string)}
-	e.mu.Lock()
-	e.sessions[sessionID] = sess
-	e.mu.Unlock()
-	defer func() {
-		e.mu.Lock()
-		delete(e.sessions, sessionID)
-		e.mu.Unlock()
-	}()
+	defer e.acquireSession(sessionID, sess)()
 
 	ep, err := e.episodes.Resolve(agentCtx, sessionID, command)
 	if err != nil {

@@ -2,7 +2,6 @@ package system
 
 import (
 	"context"
-	"fmt"
 	"gogogot/internal/tools/types"
 	"os/exec"
 	"strings"
@@ -74,15 +73,15 @@ func executeBash(ctx context.Context, input map[string]any) types.Result {
 	output := string(out)
 
 	if len(output) > types.MaxOutputSize {
-		output = output[:types.MaxOutputSize] + "\n... (output truncated)"
+		output = output[:types.MaxOutputSize] + "\n... (truncated)"
 	}
 
 	if err != nil {
 		if ctx.Err() == context.DeadlineExceeded {
 			log.Warn().Str("command", command).Dur("timeout", timeout).Dur("elapsed", elapsed).Msg("bash timeout")
-			return types.Result{Output: fmt.Sprintf("command timed out after %s\n%s", timeout, output), IsErr: true}
+			return types.Errf("command timed out after %s\n%s", timeout, output)
 		}
-		return types.Result{Output: fmt.Sprintf("exit error: %v\n%s", err, output), IsErr: true}
+		return types.Errf("exit error: %v\n%s", err, output)
 	}
 
 	if strings.TrimSpace(output) == "" {

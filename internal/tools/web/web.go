@@ -62,29 +62,29 @@ func webSearch(ctx context.Context, input map[string]any, apiKey string) types.R
 	u := fmt.Sprintf("https://api.search.brave.com/res/v1/web/search?q=%s&count=5", url.QueryEscape(query))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("request error: %v", err), IsErr: true}
+		return types.Errf("request error: %v", err)
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("X-Subscription-Token", apiKey)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("http error: %v", err), IsErr: true}
+		return types.Errf("http error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("read body error: %v", err), IsErr: true}
+		return types.Errf("read body error: %v", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return types.Result{Output: fmt.Sprintf("brave API %d: %s", resp.StatusCode, string(body)), IsErr: true}
+		return types.Errf("brave API %d: %s", resp.StatusCode, string(body))
 	}
 
 	var br braveResponse
 	if err := json.Unmarshal(body, &br); err != nil {
-		return types.Result{Output: fmt.Sprintf("json decode error: %v", err), IsErr: true}
+		return types.Errf("json decode error: %v", err)
 	}
 
 	var sb strings.Builder

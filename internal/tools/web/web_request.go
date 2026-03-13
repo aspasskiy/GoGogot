@@ -68,7 +68,7 @@ func webRequest(ctx context.Context, input map[string]any) types.Result {
 
 	req, err := http.NewRequestWithContext(ctx, method, rawURL, bodyReader)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("bad request: %v", err), IsErr: true}
+		return types.Errf("bad request: %v", err)
 	}
 
 	req.Header.Set("User-Agent", "SofieBot/1.0")
@@ -84,13 +84,13 @@ func webRequest(ctx context.Context, input map[string]any) types.Result {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("http error: %v", err), IsErr: true}
+		return types.Errf("http error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxRequestBody))
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("read body error: %v", err), IsErr: true}
+		return types.Errf("read body error: %v", err)
 	}
 
 	var sb strings.Builder
@@ -103,12 +103,12 @@ func webRequest(ctx context.Context, input map[string]any) types.Result {
 	}
 	sb.WriteString("\n")
 
-	content := string(respBody)
-	if len(content) > types.MaxOutputSize-sb.Len() {
-		content = content[:types.MaxOutputSize-sb.Len()] + "\n... (body truncated)"
-	}
-	sb.WriteString(content)
+	sb.WriteString(string(respBody))
 
 	isErr := resp.StatusCode >= 400
-	return types.Result{Output: sb.String(), IsErr: isErr}
+	out := sb.String()
+	if len(out) > types.MaxOutputSize {
+		out = out[:types.MaxOutputSize] + "\n... (truncated)"
+	}
+	return types.Result{Output: out, IsErr: isErr}
 }

@@ -58,7 +58,7 @@ func (tp *TaskPlan) create(entries []map[string]any) types.Result {
 		if s, ok := e["status"].(string); ok && s != "" {
 			parsed, valid := parseTaskStatus(s)
 			if !valid {
-				return types.Result{Output: fmt.Sprintf("invalid status %q; use pending, in_progress, or completed", s), IsErr: true}
+				return types.Errf("invalid status %q; use pending, in_progress, or completed", s)
 			}
 			status = parsed
 		}
@@ -87,7 +87,7 @@ func (tp *TaskPlan) add(title string) types.Result {
 func (tp *TaskPlan) update(id int, statusStr string) types.Result {
 	status, ok := parseTaskStatus(statusStr)
 	if !ok {
-		return types.Result{Output: fmt.Sprintf("invalid status %q; use pending, in_progress, or completed", statusStr), IsErr: true}
+		return types.Errf("invalid status %q; use pending, in_progress, or completed", statusStr)
 	}
 	tp.mu.Lock()
 	defer tp.mu.Unlock()
@@ -98,7 +98,7 @@ func (tp *TaskPlan) update(id int, statusStr string) types.Result {
 			return types.Result{Output: fmt.Sprintf("Task [%d] updated to %s.", id, status)}
 		}
 	}
-	return types.Result{Output: fmt.Sprintf("task with id %d not found", id), IsErr: true}
+	return types.Errf("task with id %d not found", id)
 }
 
 func (tp *TaskPlan) list() types.Result {

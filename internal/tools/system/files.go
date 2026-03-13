@@ -73,17 +73,10 @@ func readFile(_ context.Context, input map[string]any) types.Result {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("read error: %v", err), IsErr: true}
+		return types.Errf("read error: %v", err)
 	}
 
-	truncated := len(data) > types.MaxOutputSize
-	if truncated {
-		data = data[:types.MaxOutputSize]
-	}
-	if truncated {
-		return types.Result{Output: string(data) + "\n... (file truncated)"}
-	}
-	return types.Result{Output: string(data)}
+	return types.TruncateOutput(string(data))
 }
 
 func writeFile(_ context.Context, input map[string]any) types.Result {
@@ -95,11 +88,11 @@ func writeFile(_ context.Context, input map[string]any) types.Result {
 
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return types.Result{Output: fmt.Sprintf("mkdir error: %v", err), IsErr: true}
+		return types.Errf("mkdir error: %v", err)
 	}
 
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
-		return types.Result{Output: fmt.Sprintf("write error: %v", err), IsErr: true}
+		return types.Errf("write error: %v", err)
 	}
 	return types.Result{Output: fmt.Sprintf("wrote %d bytes to %s", len(content), path)}
 }
@@ -112,7 +105,7 @@ func listFiles(_ context.Context, input map[string]any) types.Result {
 
 	entries, err := os.ReadDir(path)
 	if err != nil {
-		return types.Result{Output: fmt.Sprintf("readdir error: %v", err), IsErr: true}
+		return types.Errf("readdir error: %v", err)
 	}
 
 	var b strings.Builder
