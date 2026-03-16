@@ -3,7 +3,7 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/core/transport"
+	"github.com/aspasskiy/gogogot/internal/core/transport"
 
 	"github.com/go-telegram/bot/models"
 )

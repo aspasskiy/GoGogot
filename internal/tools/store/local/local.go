@@ -1,7 +1,7 @@
 package local
 
 import (
-	"gogogot/internal/tools/store"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
 	"os"
 	"path/filepath"
 )

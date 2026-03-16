@@ -3,7 +3,7 @@ package system
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"os"
 	"path/filepath"
 	"strings"

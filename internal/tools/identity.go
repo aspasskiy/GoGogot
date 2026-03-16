@@ -3,8 +3,8 @@ package tools
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/tools/store"
-	"gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"time"
 
 	"github.com/rs/zerolog/log"

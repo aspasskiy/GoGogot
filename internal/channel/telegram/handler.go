@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"context"
-	"gogogot/internal/channel"
+	"github.com/aspasskiy/gogogot/internal/channel"
 	"time"
 
 	"github.com/go-telegram/bot/models"

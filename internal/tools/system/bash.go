@@ -2,7 +2,7 @@ package system
 
 import (
 	"context"
-	"gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"os/exec"
 	"strings"
 	"time"

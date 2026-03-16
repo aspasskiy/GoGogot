@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
-	"gogogot/internal/infra/utils"
-	"gogogot/internal/llm"
-	"gogogot/internal/llm/types"
-	"gogogot/internal/tools/store"
+	"github.com/aspasskiy/gogogot/internal/infra/utils"
+	"github.com/aspasskiy/gogogot/internal/llm"
+	"github.com/aspasskiy/gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
 
 	"github.com/rs/zerolog/log"
 )

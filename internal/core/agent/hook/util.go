@@ -3,7 +3,7 @@ package hook
 import (
 	"encoding/json"
 	"fmt"
-	"gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/llm/types"
 	"strings"
 	"time"
 )

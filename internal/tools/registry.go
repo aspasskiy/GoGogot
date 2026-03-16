@@ -2,11 +2,11 @@ package tools
 
 import (
 	"context"
-	llmtypes "gogogot/internal/llm/types"
-	"gogogot/internal/tools/store"
-	systemtools "gogogot/internal/tools/system"
-	"gogogot/internal/tools/types"
-	webtools "gogogot/internal/tools/web"
+	llmtypes "github.com/aspasskiy/gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
+	systemtools "github.com/aspasskiy/gogogot/internal/tools/system"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
+	webtools "github.com/aspasskiy/gogogot/internal/tools/web"
 
 	"github.com/rs/zerolog/log"
 )

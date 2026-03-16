@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/llm/types"
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"

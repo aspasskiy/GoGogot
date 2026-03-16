@@ -1,4 +1,4 @@
-module gogogot
+module github.com/aspasskiy/gogogot
 
 go 1.25.0
 

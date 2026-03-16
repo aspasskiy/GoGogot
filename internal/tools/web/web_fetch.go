@@ -3,8 +3,8 @@ package web
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/infra/utils"
-	"gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/infra/utils"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"io"
 	"net/http"
 	neturl "net/url"

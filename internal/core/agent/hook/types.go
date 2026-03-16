@@ -3,9 +3,9 @@ package hook
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/llm"
-	"gogogot/internal/llm/types"
-	"gogogot/internal/tools/store"
+	"github.com/aspasskiy/gogogot/internal/llm"
+	"github.com/aspasskiy/gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
 	"time"
 )
 

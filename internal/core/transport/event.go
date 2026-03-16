@@ -1,7 +1,7 @@
 package transport
 
 import (
-	"gogogot/internal/tools/store"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
 	"time"
 )
 

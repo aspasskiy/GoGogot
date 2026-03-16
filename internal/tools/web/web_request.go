@@ -3,7 +3,7 @@ package web
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"io"
 	"net/http"
 	"strings"

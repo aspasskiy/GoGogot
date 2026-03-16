@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/channel/telegram"
-	"gogogot/internal/core/transport"
+	"github.com/aspasskiy/gogogot/internal/channel/telegram"
+	"github.com/aspasskiy/gogogot/internal/core/transport"
 	"os"
 	"strconv"
 	"time"

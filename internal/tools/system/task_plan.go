@@ -3,8 +3,8 @@ package system
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/core/transport"
-	"gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/core/transport"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"strings"
 	"sync"
 )

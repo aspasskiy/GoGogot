@@ -2,7 +2,7 @@ package llm
 
 import (
 	"fmt"
-	"gogogot/internal/llm/catalog"
+	"github.com/aspasskiy/gogogot/internal/llm/catalog"
 	"os"
 	"strings"
 	"sync"

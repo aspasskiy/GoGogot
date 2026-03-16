@@ -2,7 +2,7 @@ package hook
 
 import (
 	"context"
-	"gogogot/internal/tools/store"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
 )
 
 func UsageAfterIteration(inputPricePerM, outputPricePerM float64) AfterIterationFunc {

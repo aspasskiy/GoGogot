@@ -3,12 +3,12 @@ package agent
 import (
 	"context"
 	"fmt"
-	"gogogot/internal/core/agent/hook"
-	"gogogot/internal/core/transport"
-	"gogogot/internal/llm"
-	"gogogot/internal/llm/types"
-	"gogogot/internal/tools/store"
-	tooltypes "gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/core/agent/hook"
+	"github.com/aspasskiy/gogogot/internal/core/transport"
+	"github.com/aspasskiy/gogogot/internal/llm"
+	"github.com/aspasskiy/gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/tools/store"
+	tooltypes "github.com/aspasskiy/gogogot/internal/tools/types"
 	"time"
 
 	"github.com/rs/zerolog/log"

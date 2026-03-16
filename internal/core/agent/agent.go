@@ -2,13 +2,13 @@ package agent
 
 import (
 	"context"
-	"gogogot/internal/core/agent/hook"
-	"gogogot/internal/core/transport"
-	"gogogot/internal/llm"
-	llmTypes "gogogot/internal/llm/types"
-	"gogogot/internal/tools"
-	"gogogot/internal/tools/system"
-	toolTypes "gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/core/agent/hook"
+	"github.com/aspasskiy/gogogot/internal/core/transport"
+	"github.com/aspasskiy/gogogot/internal/llm"
+	llmTypes "github.com/aspasskiy/gogogot/internal/llm/types"
+	"github.com/aspasskiy/gogogot/internal/tools"
+	"github.com/aspasskiy/gogogot/internal/tools/system"
+	toolTypes "github.com/aspasskiy/gogogot/internal/tools/types"
 )
 
 type Agent struct {
