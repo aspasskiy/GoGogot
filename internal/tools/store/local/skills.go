@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (s *LocalStore) LoadSkills() ([]store.Skill, error) {
@@ -13,6 +15,9 @@ func (s *LocalStore) LoadSkills() ([]store.Skill, error) {
 }
 
 func (s *LocalStore) CreateSkill(name, description, body string) (string, error) {
+	if err := (&store.Skill{Name: name, Description: description}).Validate(); err != nil {
+		return "", fmt.Errorf("failed to validate skill: %w", err)
+	}
 	safeName := sanitizeSkillName(name)
 	skillDir := filepath.Join(s.SkillsDir(), safeName)
 
@@ -38,6 +43,13 @@ func (s *LocalStore) UpdateSkill(name, content string) error {
 
 	if _, err := os.Stat(skillMd); os.IsNotExist(err) {
 		return fmt.Errorf("skill %q not found", safeName)
+	}
+	parsedName, parsedDesc := parseSkillFrontmatter(content)
+	if parsedName == "" {
+		parsedName = safeName
+	}
+	if err := (&store.Skill{Name: parsedName, Description: parsedDesc, FilePath: skillMd}).Validate(); err != nil {
+		return err
 	}
 	return os.WriteFile(skillMd, []byte(content), 0o644)
 }
@@ -86,12 +98,17 @@ func loadSkillsFromDir(rootDir string) ([]store.Skill, error) {
 		if name == "" {
 			name = e.Name()
 		}
-		out = append(out, store.Skill{
+		sk := store.Skill{
 			Name:        name,
 			Description: desc,
 			FilePath:    skillMd,
 			Dir:         filepath.Join(rootDir, e.Name()),
-		})
+		}
+		if err := sk.Validate(); err != nil {
+			log.Warn().Err(err).Str("skill", sk.Name).Str("path", sk.FilePath).Msg("skills: skipping invalid skill")
+			continue
+		}
+		out = append(out, sk)
 	}
 	return out, nil
 }

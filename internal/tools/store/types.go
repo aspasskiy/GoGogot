@@ -2,8 +2,11 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gogogot/internal/llm/types"
+	"os"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -35,10 +38,10 @@ func (e *Episode) Close() {
 	e.EndedAt = time.Now()
 }
 
-func (e *Episode) Save() error                    { return e.persister.SaveEpisode(e) }
-func (e *Episode) LoadMessages() error            { return e.persister.LoadMessages(e) }
+func (e *Episode) Save() error                      { return e.persister.SaveEpisode(e) }
+func (e *Episode) LoadMessages() error              { return e.persister.LoadMessages(e) }
 func (e *Episode) TextMessages() ([]Message, error) { return e.persister.TextMessages(e) }
-func (e *Episode) HasMessages() bool              { return e.persister.HasMessages(e) }
+func (e *Episode) HasMessages() bool                { return e.persister.HasMessages(e) }
 
 func (e *Episode) AppendMessage(msg Turn) {
 	if msg.Timestamp.IsZero() {
@@ -56,8 +59,8 @@ func (e *Episode) ReplaceMessages(msgs []Turn) error {
 	return e.persister.ReplaceMessages(e, msgs)
 }
 
-func (e *Episode) Messages() []Turn      { return e.messages }
-func (e *Episode) TotalUsage() *Usage    { return &e.totalUsage }
+func (e *Episode) Messages() []Turn        { return e.messages }
+func (e *Episode) TotalUsage() *Usage      { return &e.totalUsage }
 func (e *Episode) SetMessages(msgs []Turn) { e.messages = msgs }
 
 type EpisodeInfo struct {
@@ -125,6 +128,15 @@ type MemoryFile struct {
 
 // --- Skills ---
 
+const (
+	SkillFileName          = "SKILL.md"
+	MaxNameLength          = 64
+	MaxDescriptionLength   = 1024
+	MaxCompatibilityLength = 500
+)
+
+var namePattern = regexp.MustCompile(`^[a-zA-Z0-9]+(-[a-zA-Z0-9]+)*$`)
+
 type Skill struct {
 	Name        string
 	Description string
@@ -144,4 +156,33 @@ func FormatSkillsForPrompt(skills []Skill) string {
 	}
 	b.WriteString("</available_skills>")
 	return b.String()
+}
+
+func (s *Skill) Validate() error {
+	var errs error
+	if s.Name == "" {
+		errs = errors.Join(errs, errors.New("name is required"))
+	} else {
+		if len(s.Name) > MaxNameLength {
+			errs = errors.Join(errs, fmt.Errorf("name exceeds %d characters", MaxNameLength))
+		}
+
+		if !namePattern.MatchString(s.Name) {
+			errs = errors.Join(errs, errors.New("name must be alphanumeric with hyphens, no leading/trailing/consecutive hyphens"))
+		}
+
+		if s.FilePath != "" {
+			if _, err := os.Stat(s.FilePath); os.IsNotExist(err) {
+				errs = errors.Join(errs, fmt.Errorf("skill file %q does not exist", s.FilePath))
+			}
+		}
+	}
+
+	if s.Description == "" {
+		errs = errors.Join(errs, errors.New("description is required"))
+	} else if len(s.Description) > MaxDescriptionLength {
+		errs = errors.Join(errs, fmt.Errorf("description exceeds %d characters", MaxDescriptionLength))
+	}
+
+	return errs
 }
