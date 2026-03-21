@@ -8,59 +8,61 @@ import (
 	"time"
 )
 
-// --- Episode ---
+// --- Chat ---
 
-type Episode struct {
-	ID           string    `json:"id"`
-	Title        string    `json:"title"`
-	Summary      string    `json:"summary"`
-	Tags         []string  `json:"tags"`
-	Status       string    `json:"status"` // "active" | "closed"
-	RunSummary   string    `json:"run_summary,omitempty"`
-	UserMsgCount int       `json:"user_msg_count,omitempty"`
-	StartedAt    time.Time `json:"started_at"`
-	EndedAt      time.Time `json:"ended_at,omitempty"`
-	UpdatedAt    time.Time `json:"updated_at"`
+type Chat struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Summary   string    `json:"summary"`
+	Tags      []string  `json:"tags"`
+	Status    string    `json:"status"` // "active" | "closed"
+	UserTurns int       `json:"user_turns"`
+	StartedAt time.Time `json:"started_at"`
+	EndedAt   time.Time `json:"ended_at,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
 
-	persister  EpisodePersister `json:"-"`
-	messages   []Turn           `json:"-"`
-	totalUsage Usage            `json:"-"`
+	persister  ChatPersister `json:"-"`
+	messages   []Turn        `json:"-"`
+	totalUsage Usage         `json:"-"`
 }
 
-func (e *Episode) SetPersister(p EpisodePersister) { e.persister = p }
-func (e *Episode) String() string                  { return e.ID }
+func (c *Chat) SetPersister(p ChatPersister) { c.persister = p }
+func (c *Chat) String() string               { return c.ID }
 
-func (e *Episode) Close() {
-	e.Status = "closed"
-	e.EndedAt = time.Now()
+func (c *Chat) Close() {
+	c.Status = "closed"
+	c.EndedAt = time.Now()
 }
 
-func (e *Episode) Save() error                    { return e.persister.SaveEpisode(e) }
-func (e *Episode) LoadMessages() error            { return e.persister.LoadMessages(e) }
-func (e *Episode) TextMessages() ([]Message, error) { return e.persister.TextMessages(e) }
-func (e *Episode) HasMessages() bool              { return e.persister.HasMessages(e) }
+func (c *Chat) Save() error                      { return c.persister.SaveChat(c) }
+func (c *Chat) LoadMessages() error              { return c.persister.LoadMessages(c) }
+func (c *Chat) TextMessages() ([]Message, error) { return c.persister.TextMessages(c) }
+func (c *Chat) HasMessages() bool                { return c.persister.HasMessages(c) }
 
-func (e *Episode) AppendMessage(msg Turn) {
+func (c *Chat) AppendMessage(msg Turn) {
 	if msg.Timestamp.IsZero() {
 		msg.Timestamp = time.Now()
 	}
 	if msg.Usage != nil {
-		e.totalUsage.Add(*msg.Usage)
+		c.totalUsage.Add(*msg.Usage)
 	}
-	e.messages = append(e.messages, msg)
-	e.persister.AppendMessage(e, msg)
+	if msg.Role == "user" {
+		c.UserTurns++
+	}
+	c.messages = append(c.messages, msg)
+	c.persister.AppendMessage(c, msg)
 }
 
-func (e *Episode) ReplaceMessages(msgs []Turn) error {
-	e.messages = msgs
-	return e.persister.ReplaceMessages(e, msgs)
+func (c *Chat) ReplaceMessages(msgs []Turn) error {
+	c.messages = msgs
+	return c.persister.ReplaceMessages(c, msgs)
 }
 
-func (e *Episode) Messages() []Turn      { return e.messages }
-func (e *Episode) TotalUsage() *Usage    { return &e.totalUsage }
-func (e *Episode) SetMessages(msgs []Turn) { e.messages = msgs }
+func (c *Chat) Messages() []Turn        { return c.messages }
+func (c *Chat) TotalUsage() *Usage      { return &c.totalUsage }
+func (c *Chat) SetMessages(msgs []Turn) { c.messages = msgs }
 
-type EpisodeInfo struct {
+type ChatInfo struct {
 	ID        string
 	Title     string
 	Summary   string
@@ -70,8 +72,8 @@ type EpisodeInfo struct {
 	EndedAt   time.Time
 }
 
-// EpisodeSearchFunc is a callback that searches past episodes by query.
-type EpisodeSearchFunc func(ctx context.Context, query string) ([]EpisodeInfo, error)
+// ChatSearchFunc is a callback that searches past chats by query.
+type ChatSearchFunc func(ctx context.Context, query string) ([]ChatInfo, error)
 
 // --- Messages & Usage ---
 
@@ -116,11 +118,19 @@ func (u *Usage) Add(other Usage) {
 	u.Duration += other.Duration
 }
 
+// --- Identity ---
+
+type SoulInfo struct {
+	Soul string
+	User string
+}
+
 // --- Memory ---
 
 type MemoryFile struct {
-	Name string
-	Size int64
+	Name    string
+	Size    int64
+	Content string
 }
 
 // --- Skills ---

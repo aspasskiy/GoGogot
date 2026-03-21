@@ -1,4 +1,4 @@
-package episode
+package chat
 
 import (
 	"context"
@@ -20,17 +20,17 @@ Example: [1, 4, 7]
 If nothing is relevant, return: []
 No explanation, no extra text.`
 
-// SearchRelevant uses the LLM to find past episodes semantically related to the query.
-func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.EpisodeInfo, error) {
-	all, err := m.store.ListEpisodes()
+// SearchRelevant uses the LLM to find past chats semantically related to the query.
+func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.ChatInfo, error) {
+	all, err := m.store.ListChats()
 	if err != nil {
 		return nil, err
 	}
 
-	var closed []store.EpisodeInfo
-	for _, ep := range all {
-		if ep.Status == "closed" && ep.Summary != "" {
-			closed = append(closed, ep)
+	var closed []store.ChatInfo
+	for _, ch := range all {
+		if ch.Status == "closed" && ch.Summary != "" {
+			closed = append(closed, ch)
 		}
 	}
 	if len(closed) == 0 {
@@ -41,15 +41,15 @@ func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.Epi
 	}
 
 	var catalog strings.Builder
-	for i, ep := range closed {
-		title := ep.Title
+	for i, ch := range closed {
+		title := ch.Title
 		if title == "" {
 			title = "Untitled"
 		}
-		date := ep.StartedAt.Format("02 Jan 2006")
-		fmt.Fprintf(&catalog, "%d. [%s] (%s): %s", i+1, title, date, ep.Summary)
-		if len(ep.Tags) > 0 {
-			fmt.Fprintf(&catalog, " [tags: %s]", strings.Join(ep.Tags, ", "))
+		date := ch.StartedAt.Format("02 Jan 2006")
+		fmt.Fprintf(&catalog, "%d. [%s] (%s): %s", i+1, title, date, ch.Summary)
+		if len(ch.Tags) > 0 {
+			fmt.Fprintf(&catalog, " [tags: %s]", strings.Join(ch.Tags, ", "))
 		}
 		catalog.WriteByte('\n')
 	}
@@ -68,7 +68,7 @@ func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.Epi
 
 	indices := parseSearchResponse(types.ExtractText(resp.Content))
 
-	var matches []store.EpisodeInfo
+	var matches []store.ChatInfo
 	for _, idx := range indices {
 		if idx >= 1 && idx <= len(closed) {
 			matches = append(matches, closed[idx-1])
@@ -83,9 +83,9 @@ func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.Epi
 	return matches, nil
 }
 
-// SearchEpisodes performs a simple word-based search over closed episodes.
-func (m *Manager) SearchEpisodes(query string) ([]store.EpisodeInfo, error) {
-	all, err := m.store.ListEpisodes()
+// SearchChats performs a simple word-based search over closed chats.
+func (m *Manager) SearchChats(query string) ([]store.ChatInfo, error) {
+	all, err := m.store.ListChats()
 	if err != nil {
 		return nil, err
 	}
@@ -96,12 +96,12 @@ func (m *Manager) SearchEpisodes(query string) ([]store.EpisodeInfo, error) {
 		return nil, nil
 	}
 
-	var matches []store.EpisodeInfo
-	for _, ep := range all {
-		if ep.Status != "closed" || ep.Summary == "" {
+	var matches []store.ChatInfo
+	for _, ch := range all {
+		if ch.Status != "closed" || ch.Summary == "" {
 			continue
 		}
-		corpus := strings.ToLower(ep.Title + " " + ep.Summary + " " + strings.Join(ep.Tags, " "))
+		corpus := strings.ToLower(ch.Title + " " + ch.Summary + " " + strings.Join(ch.Tags, " "))
 		matched := false
 		for _, w := range words {
 			if strings.Contains(corpus, w) {
@@ -110,7 +110,7 @@ func (m *Manager) SearchEpisodes(query string) ([]store.EpisodeInfo, error) {
 			}
 		}
 		if matched {
-			matches = append(matches, ep)
+			matches = append(matches, ch)
 		}
 	}
 

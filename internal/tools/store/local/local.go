@@ -24,12 +24,12 @@ func New(dataDir string) (store.Store, error) {
 func (s *LocalStore) DataDir() string  { return s.dataDir }
 func (s *LocalStore) SkillsDir() string { return filepath.Join(s.dataDir, "skills") }
 
-func (s *LocalStore) episodesDir() string       { return filepath.Join(s.dataDir, "episodes") }
-func (s *LocalStore) memoryDir() string         { return filepath.Join(s.dataDir, "memory") }
-func (s *LocalStore) activeEpisodePath() string { return filepath.Join(s.dataDir, "active_episode.txt") }
+func (s *LocalStore) chatsDir() string       { return filepath.Join(s.dataDir, "episodes") }
+func (s *LocalStore) memoryDir() string      { return filepath.Join(s.dataDir, "memory") }
+func (s *LocalStore) activeChatPath() string { return filepath.Join(s.dataDir, "active_episode.txt") }
 
 func (s *LocalStore) ensureDirs() error {
-	for _, dir := range []string{s.episodesDir(), s.memoryDir(), s.SkillsDir()} {
+	for _, dir := range []string{s.chatsDir(), s.memoryDir(), s.SkillsDir()} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return err
 		}

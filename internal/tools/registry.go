@@ -15,10 +15,10 @@ type Registry struct {
 	tt map[string]types.Tool
 }
 
-// EpisodeSearchFunc searches past episodes by semantic relevance.
-type EpisodeSearchFunc = store.EpisodeSearchFunc
+// ChatSearchFunc searches past chats by semantic relevance.
+type ChatSearchFunc = store.ChatSearchFunc
 
-func NewRegistry(st store.Store, braveAPIKey string, searchFn EpisodeSearchFunc, extra ...types.Tool) *Registry {
+func NewRegistry(st store.Store, braveAPIKey string, searchFn ChatSearchFunc, extra ...types.Tool) *Registry {
 	all := []types.Tool{
 		systemtools.BashTool(),
 		systemtools.EditFileTool(),

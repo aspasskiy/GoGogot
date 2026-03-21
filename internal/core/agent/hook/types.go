@@ -10,7 +10,7 @@ import (
 )
 
 // Conversation is the agent's view of a conversation store.
-// Decouples the agent loop from the concrete store.Episode implementation.
+// Decouples the agent loop from the concrete store.Chat implementation.
 type Conversation interface {
 	fmt.Stringer
 	Messages() []store.Turn

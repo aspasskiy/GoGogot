@@ -11,28 +11,34 @@ import (
 )
 
 var commandMap = map[string]string{
-	"/start":   channel.CmdNewEpisode,
-	"/new":     channel.CmdNewEpisode,
+	"/start":   channel.CmdNewChat,
+	"/new":     channel.CmdNewChat,
 	"/stop":    channel.CmdStop,
 	"/history": channel.CmdHistory,
 	"/memory":  channel.CmdMemory,
+	"/soul":    channel.CmdSoul,
+	"/user":    channel.CmdUser,
 }
 
 var commandSuccess = map[string]string{
-	channel.CmdNewEpisode: "✨ New conversation started.",
+	channel.CmdNewChat: "✨ New conversation started.",
 }
 
 var commandEmpty = map[string]string{
 	channel.CmdHistory: "No conversation history yet.",
 	channel.CmdMemory:  "Memory is empty — no files yet.",
+	channel.CmdSoul:    "Soul not configured yet — no soul.md.",
+	channel.CmdUser:    "User profile not configured yet — no user.md.",
 }
 
 func (c *Channel) handleCommand(ctx context.Context, chatID int64, reply transport.Replier, cmdText string) {
 	if cmdText == "/help" {
 		c.send(ctx, chatID, "*Commands:*\n"+
 			"/new — start a fresh conversation\n"+
-			"/history — view past conversation episodes\n"+
+			"/history — view past conversations\n"+
 			"/memory — list memory files\n"+
+			"/soul — show agent identity\n"+
+			"/user — show user profile\n"+
 			"/stop — cancel the current task\n"+
 			"/help — show this help")
 		return
@@ -74,7 +80,7 @@ func (c *Channel) handleCommand(ctx context.Context, chatID int64, reply transpo
 
 func formatPayload(payload any) string {
 	switch v := payload.(type) {
-	case []store.EpisodeInfo:
+	case []store.ChatInfo:
 		return FormatHistory(v)
 	case []store.MemoryFile:
 		return FormatMemory(v)
@@ -83,11 +89,11 @@ func formatPayload(payload any) string {
 	}
 }
 
-func FormatHistory(episodes []store.EpisodeInfo) string {
-	var closed []store.EpisodeInfo
-	for _, ep := range episodes {
-		if ep.Status == "closed" {
-			closed = append(closed, ep)
+func FormatHistory(chats []store.ChatInfo) string {
+	var closed []store.ChatInfo
+	for _, ch := range chats {
+		if ch.Status == "closed" {
+			closed = append(closed, ch)
 		}
 	}
 	if len(closed) == 0 {
@@ -101,28 +107,28 @@ func FormatHistory(episodes []store.EpisodeInfo) string {
 
 	var sb strings.Builder
 	sb.WriteString("📜 **Conversation history:**\n\n")
-	for _, ep := range closed {
-		title := ep.Title
+	for _, ch := range closed {
+		title := ch.Title
 		if title == "" {
 			title = "Untitled"
 		}
 		if len([]rune(title)) > 50 {
 			title = string([]rune(title)[:50]) + "…"
 		}
-		date := ep.StartedAt.Format("02 Jan")
-		if !ep.EndedAt.IsZero() && ep.EndedAt.Format("02 Jan") != date {
-			date += " — " + ep.EndedAt.Format("02 Jan")
+		date := ch.StartedAt.Format("02 Jan")
+		if !ch.EndedAt.IsZero() && ch.EndedAt.Format("02 Jan") != date {
+			date += " — " + ch.EndedAt.Format("02 Jan")
 		}
 		fmt.Fprintf(&sb, "**%s** (%s)\n", title, date)
-		if ep.Summary != "" {
-			summary := ep.Summary
+		if ch.Summary != "" {
+			summary := ch.Summary
 			if len([]rune(summary)) > 120 {
 				summary = string([]rune(summary)[:120]) + "…"
 			}
 			fmt.Fprintf(&sb, "*%s*\n", summary)
 		}
-		if len(ep.Tags) > 0 {
-			fmt.Fprintf(&sb, "`%s`\n", strings.Join(ep.Tags, ", "))
+		if len(ch.Tags) > 0 {
+			fmt.Fprintf(&sb, "`%s`\n", strings.Join(ch.Tags, ", "))
 		}
 		sb.WriteByte('\n')
 	}
@@ -135,9 +141,12 @@ func FormatMemory(files []store.MemoryFile) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString("📂 **Memory files:**\n\n")
-	for _, f := range files {
-		fmt.Fprintf(&sb, "`%s` (%d bytes)\n", f.Name, f.Size)
+	for i, f := range files {
+		if i > 0 {
+			sb.WriteString("\n---\n\n")
+		}
+		fmt.Fprintf(&sb, "📂 **%s**\n\n%s\n", f.Name, strings.TrimSpace(f.Content))
 	}
 	return sb.String()
 }
+

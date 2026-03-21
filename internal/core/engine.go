@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"gogogot/internal/channel"
 	"gogogot/internal/core/agent"
-	"gogogot/internal/core/episode"
+	"gogogot/internal/core/chat"
 	"gogogot/internal/core/prompt"
 	"gogogot/internal/core/transport"
 	"gogogot/internal/infra/scheduler"
@@ -26,7 +26,7 @@ type Engine struct {
 	ch        channel.Channel
 	agent     *agent.Agent
 	store     store.Store
-	episodes  *episode.Manager
+	chats     *chat.Manager
 	scheduler *scheduler.Scheduler
 	registry  *tools.Registry
 
@@ -38,7 +38,7 @@ type Params struct {
 	Channel   channel.Channel
 	Store     store.Store
 	Agent     *agent.Agent
-	Episodes  *episode.Manager
+	Chats     *chat.Manager
 	Scheduler *scheduler.Scheduler
 	Registry  *tools.Registry
 }
@@ -48,7 +48,7 @@ func New(p Params) *Engine {
 		ch:        p.Channel,
 		store:     p.Store,
 		agent:     p.Agent,
-		episodes:  p.Episodes,
+		chats:     p.Chats,
 		scheduler: p.Scheduler,
 		registry:  p.Registry,
 	}
@@ -109,16 +109,16 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	cmd := msg.Command
 	switch cmd.Name {
-	case channel.CmdNewEpisode:
-		cmd.Result.Error = e.episodes.Reset(ctx)
+	case channel.CmdNewChat:
+		cmd.Result.Error = e.chats.Reset(ctx)
 	case channel.CmdStop:
 		e.stopAgent(cmd)
 	case channel.CmdHistory:
-		episodes, err := e.store.ListEpisodes()
+		chats, err := e.store.ListChats()
 		if err != nil {
 			cmd.Result.Error = err
 		} else {
-			cmd.Result.Payload = episodes
+			cmd.Result.Payload = chats
 		}
 	case channel.CmdMemory:
 		files, err := e.store.ListMemory()
@@ -126,6 +126,14 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 			cmd.Result.Error = err
 		} else {
 			cmd.Result.Payload = files
+		}
+	case channel.CmdSoul:
+		if soul := e.store.ReadSoul(); soul != "" {
+			cmd.Result.Data = map[string]string{"text": "🧬 **Soul:**\n\n" + soul}
+		}
+	case channel.CmdUser:
+		if user := e.store.ReadUser(); user != "" {
+			cmd.Result.Data = map[string]string{"text": "👤 **User:**\n\n" + user}
 		}
 	}
 }
@@ -157,24 +165,22 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 
 	bus, recv := transport.NewBus(64)
 
-	res, err := e.episodes.Resolve(agentCtx, msg.Text)
+	ch, err := e.chats.Resolve()
 	if err != nil {
 		bus.Close()
-		log.Error().Err(err).Msg("engine: failed to resolve episode")
+		log.Error().Err(err).Msg("engine: failed to resolve chat")
 		_ = reply.SendText(ctx, "Error: "+err.Error())
 		return
 	}
-	ep := res.Episode
-	e.emitEpisodeEvents(bus, res)
 
 	agentCtx = transport.WithReplier(agentCtx, reply)
 
-	blocks, cleanup := transport.ProcessAttachments(ep.ID, msg.Text, msg.Attachments)
+	blocks, cleanup := transport.ProcessAttachments(ch.ID, msg.Text, msg.Attachments)
 	defer cleanup()
 
 	go func() {
 		defer bus.Close()
-		if err := e.agent.Run(agentCtx, ep, blocks, bus); err != nil {
+		if err := e.agent.Run(agentCtx, ch, blocks, bus); err != nil {
 			log.Error().Err(err).Msg("engine: agent run failed")
 		}
 	}()
@@ -183,6 +189,8 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 	if finalText != "" {
 		_ = reply.SendText(ctx, finalText)
 	}
+
+	e.chats.SummarizeIfNeeded(context.WithoutCancel(ctx), ch)
 }
 
 func (e *Engine) stopAgent(cmd *channel.Command) {
@@ -199,30 +207,7 @@ func (e *Engine) stopAgent(cmd *channel.Command) {
 	cmd.Result.Data = map[string]string{"text": "⏹ Stopping..."}
 }
 
-func (e *Engine) emitEpisodeEvents(bus *transport.Bus, res *episode.ResolveResult) {
-	if res.Decision != "" {
-		bus.Emit(transport.EpisodeClassify, transport.EpisodeClassifyData{
-			Decision:     res.Decision,
-			OldEpisodeID: res.OldEpisodeID,
-			NewEpisodeID: res.Episode.ID,
-		})
-	}
-	if res.CloseSummarized {
-		bus.Emit(transport.EpisodeSummarize, transport.EpisodeSummarizeData{
-			EpisodeID: res.OldEpisodeID,
-			Kind:      "close",
-			Title:     res.Episode.Title,
-		})
-	}
-	if res.RunSummaryUpdated {
-		bus.Emit(transport.EpisodeSummarize, transport.EpisodeSummarizeData{
-			EpisodeID: res.Episode.ID,
-			Kind:      "run_summary",
-		})
-	}
-}
-
-// RunScheduledTask executes a scheduled task in the active episode.
+// RunScheduledTask executes a scheduled task in the active chat.
 // It runs synchronously and returns the agent's text output.
 // If the agent is already busy, it returns an error so the scheduler can
 // apply backoff and retry later.
@@ -243,13 +228,11 @@ func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, 
 
 	bus, recv := transport.NewBus(64)
 
-	res, err := e.episodes.Resolve(agentCtx, command)
+	ch, err := e.chats.Resolve()
 	if err != nil {
 		bus.Close()
-		return "", fmt.Errorf("resolve episode: %w", err)
+		return "", fmt.Errorf("resolve chat: %w", err)
 	}
-	ep := res.Episode
-	e.emitEpisodeEvents(bus, res)
 
 	promptText := prompt.ScheduledTaskPrompt(taskID, command, skill)
 	blocks := []types.ContentBlock{types.TextBlock(promptText)}
@@ -259,7 +242,7 @@ func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, 
 	go func() {
 		defer close(done)
 		defer bus.Close()
-		runErr = e.agent.Run(agentCtx, ep, blocks, bus)
+		runErr = e.agent.Run(agentCtx, ch, blocks, bus)
 	}()
 
 	var finalText string

@@ -18,11 +18,11 @@ type jsonMessage struct {
 	Compacted bool                 `json:"compacted,omitempty"`
 }
 
-func (s *LocalStore) LoadMessages(ep *store.Episode) error {
+func (s *LocalStore) LoadMessages(ch *store.Chat) error {
 	msgs := make([]store.Turn, 0)
-	f, err := os.Open(s.messagesPath(ep))
+	f, err := os.Open(s.messagesPath(ch))
 	if os.IsNotExist(err) {
-		ep.SetMessages(msgs)
+		ch.SetMessages(msgs)
 		return nil
 	}
 	if err != nil {
@@ -39,7 +39,7 @@ func (s *LocalStore) LoadMessages(ep *store.Episode) error {
 		}
 		var jm jsonMessage
 		if err := json.Unmarshal(line, &jm); err != nil {
-			log.Warn().Err(err).Msg("episode: skipping corrupt JSONL line")
+			log.Warn().Err(err).Msg("chat: skipping corrupt JSONL line")
 			continue
 		}
 		msg := store.Turn{
@@ -52,23 +52,23 @@ func (s *LocalStore) LoadMessages(ep *store.Episode) error {
 		}
 		msgs = append(msgs, msg)
 	}
-	ep.SetMessages(msgs)
+	ch.SetMessages(msgs)
 	return scanner.Err()
 }
 
-func (s *LocalStore) AppendMessage(ep *store.Episode, msg store.Turn) {
-	path := s.messagesPath(ep)
+func (s *LocalStore) AppendMessage(ch *store.Chat, msg store.Turn) {
+	path := s.messagesPath(ch)
 	if path == "" {
 		return
 	}
 	line, err := json.Marshal(turnToJSON(msg))
 	if err != nil {
-		log.Error().Err(err).Msg("episode: failed to marshal message for JSONL")
+		log.Error().Err(err).Msg("chat: failed to marshal message for JSONL")
 		return
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		log.Error().Err(err).Msg("episode: failed to open JSONL for append")
+		log.Error().Err(err).Msg("chat: failed to open JSONL for append")
 		return
 	}
 	defer f.Close()
@@ -76,8 +76,8 @@ func (s *LocalStore) AppendMessage(ep *store.Episode, msg store.Turn) {
 	f.Write([]byte{'\n'})
 }
 
-func (s *LocalStore) ReplaceMessages(ep *store.Episode, msgs []store.Turn) error {
-	path := s.messagesPath(ep)
+func (s *LocalStore) ReplaceMessages(ch *store.Chat, msgs []store.Turn) error {
+	path := s.messagesPath(ch)
 	if path == "" {
 		return nil
 	}
@@ -97,8 +97,8 @@ func (s *LocalStore) ReplaceMessages(ep *store.Episode, msgs []store.Turn) error
 	return nil
 }
 
-func (s *LocalStore) TextMessages(ep *store.Episode) ([]store.Message, error) {
-	f, err := os.Open(s.messagesPath(ep))
+func (s *LocalStore) TextMessages(ch *store.Chat) ([]store.Message, error) {
+	f, err := os.Open(s.messagesPath(ch))
 	if os.IsNotExist(err) {
 		return nil, nil
 	}
@@ -131,8 +131,8 @@ func (s *LocalStore) TextMessages(ep *store.Episode) ([]store.Message, error) {
 	return msgs, scanner.Err()
 }
 
-func (s *LocalStore) HasMessages(ep *store.Episode) bool {
-	info, err := os.Stat(s.messagesPath(ep))
+func (s *LocalStore) HasMessages(ch *store.Chat) bool {
+	info, err := os.Stat(s.messagesPath(ch))
 	return err == nil && info.Size() > 0
 }
 

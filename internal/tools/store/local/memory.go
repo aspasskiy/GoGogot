@@ -22,7 +22,8 @@ func (s *LocalStore) ListMemory() ([]store.MemoryFile, error) {
 		if err != nil {
 			continue
 		}
-		out = append(out, store.MemoryFile{Name: e.Name(), Size: info.Size()})
+		data, _ := os.ReadFile(filepath.Join(s.memoryDir(), e.Name()))
+		out = append(out, store.MemoryFile{Name: e.Name(), Size: info.Size(), Content: string(data)})
 	}
 	return out, nil
 }

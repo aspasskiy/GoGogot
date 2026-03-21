@@ -114,7 +114,7 @@ Always update memory after making changes to the system.`
 
 func buildRecallSection() string {
 	return `CONVERSATION HISTORY: You have a recall tool to search your past conversations.
-Each conversation is stored as an episode with a summary and tags.
+Each conversation is stored with a summary and tags.
 Use recall when:
 - The user references something from a past conversation
 - You need to check if something was discussed or decided before

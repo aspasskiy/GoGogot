@@ -6,23 +6,23 @@ import (
 	"strings"
 )
 
-func (s *LocalStore) GetActiveEpisodeID() (string, error) {
-	epID, err := s.loadActiveEpisodeID()
+func (s *LocalStore) GetActiveChatID() (string, error) {
+	chatID, err := s.loadActiveChatID()
 	if err != nil {
 		return "", err
 	}
-	if epID == "" {
-		return "", fmt.Errorf("no active episode")
+	if chatID == "" {
+		return "", fmt.Errorf("no active chat")
 	}
-	return epID, nil
+	return chatID, nil
 }
 
-func (s *LocalStore) SetActiveEpisodeID(episodeID string) error {
-	return os.WriteFile(s.activeEpisodePath(), []byte(episodeID+"\n"), 0o644)
+func (s *LocalStore) SetActiveChatID(chatID string) error {
+	return os.WriteFile(s.activeChatPath(), []byte(chatID+"\n"), 0o644)
 }
 
-func (s *LocalStore) loadActiveEpisodeID() (string, error) {
-	data, err := os.ReadFile(s.activeEpisodePath())
+func (s *LocalStore) loadActiveChatID() (string, error) {
+	data, err := os.ReadFile(s.activeChatPath())
 	if os.IsNotExist(err) {
 		return "", nil
 	}

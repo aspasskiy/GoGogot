@@ -5,16 +5,16 @@ import "time"
 // Store defines the persistence contract for all application data.
 // Implementations may use a local filesystem, S3, or any other backend.
 type Store interface {
-	EpisodePersister
+	ChatPersister
 
-	// Episodes
-	NewEpisode() *Episode
-	LoadEpisode(id string) (*Episode, error)
-	ListEpisodes() ([]EpisodeInfo, error)
+	// Chats
+	NewChat() *Chat
+	LoadChat(id string) (*Chat, error)
+	ListChats() ([]ChatInfo, error)
 
-	// Active episode mapping
-	GetActiveEpisodeID() (string, error)
-	SetActiveEpisodeID(id string) error
+	// Active chat mapping
+	GetActiveChatID() (string, error)
+	SetActiveChatID(id string) error
 
 	// Memory
 	ListMemory() ([]MemoryFile, error)
@@ -38,13 +38,13 @@ type Store interface {
 	ReadSkill(name string) (string, error)
 }
 
-// EpisodePersister is the subset of Store that Episode delegates its I/O to.
+// ChatPersister is the subset of Store that Chat delegates its I/O to.
 // Concrete store implementations satisfy this automatically by implementing Store.
-type EpisodePersister interface {
-	SaveEpisode(ep *Episode) error
-	LoadMessages(ep *Episode) error
-	AppendMessage(ep *Episode, msg Turn)
-	ReplaceMessages(ep *Episode, msgs []Turn) error
-	TextMessages(ep *Episode) ([]Message, error)
-	HasMessages(ep *Episode) bool
+type ChatPersister interface {
+	SaveChat(ch *Chat) error
+	LoadMessages(ch *Chat) error
+	AppendMessage(ch *Chat, msg Turn)
+	ReplaceMessages(ch *Chat, msgs []Turn) error
+	TextMessages(ch *Chat) ([]Message, error)
+	HasMessages(ch *Chat) bool
 }

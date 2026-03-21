@@ -8,7 +8,7 @@ import (
 	"gogogot/internal/core"
 	"gogogot/internal/core/agent"
 	"gogogot/internal/core/agent/hook"
-	"gogogot/internal/core/episode"
+	"gogogot/internal/core/chat"
 	"gogogot/internal/core/prompt"
 	"gogogot/internal/infra/config"
 	"gogogot/internal/infra/logger"
@@ -94,9 +94,9 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 	extra = append(extra, tools.IdentityTools(st, sched.SetLocation)...)
 
 	client := llm.NewClient(*provider, nil)
-	epMgr := episode.NewManager(st, client)
+	chatMgr := chat.NewManager(st, client)
 
-	reg := tools.NewRegistry(st, cfg.BraveAPIKey, epMgr.SearchRelevant, extra...)
+	reg := tools.NewRegistry(st, cfg.BraveAPIKey, chatMgr.SearchRelevant, extra...)
 	client.SetTools(reg.Definitions())
 
 	transportName := ch.Name()
@@ -120,7 +120,7 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 		Channel:   ch,
 		Store:     st,
 		Agent:     ag,
-		Episodes:  epMgr,
+		Chats:     chatMgr,
 		Scheduler: sched,
 		Registry:  reg,
 	}), nil

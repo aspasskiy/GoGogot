@@ -6,10 +6,12 @@ import (
 )
 
 const (
-	CmdNewEpisode = "new_episode"
-	CmdStop       = "stop"
-	CmdHistory    = "history"
-	CmdMemory     = "memory"
+	CmdNewChat = "new_chat"
+	CmdStop    = "stop"
+	CmdHistory = "history"
+	CmdMemory  = "memory"
+	CmdSoul    = "soul"
+	CmdUser    = "user"
 )
 
 type Command struct {
