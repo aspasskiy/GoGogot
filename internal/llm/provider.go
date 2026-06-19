@@ -113,8 +113,23 @@ func ResolveProvider(modelID, provider string) (*Provider, error) {
 		}
 		return resolveOpenRouter(modelID, modelID)
 
+	case "requesty":
+		if _, ok := getAnthropicCatalog()[modelID]; ok {
+			if orSlug, ok := anthropicToOpenRouter[modelID]; ok {
+				return resolveRequesty(modelID, orSlug)
+			}
+			return nil, fmt.Errorf("model %q has no Requesty equivalent", modelID)
+		}
+		if _, ok := getOpenAICatalog()[modelID]; ok {
+			return resolveRequesty(modelID, "openai/"+modelID)
+		}
+		if !strings.Contains(modelID, "/") {
+			return nil, fmt.Errorf("unknown model %q — use a full Requesty slug (vendor/model)", modelID)
+		}
+		return resolveRequesty(modelID, modelID)
+
 	default:
-		return nil, fmt.Errorf("unknown provider %q — use 'anthropic', 'openai', or 'openrouter'", provider)
+		return nil, fmt.Errorf("unknown provider %q — use 'anthropic', 'openai', 'openrouter', or 'requesty'", provider)
 	}
 }
 
@@ -143,6 +158,33 @@ func resolveOpenRouter(id, slug string) (*Provider, error) {
 	p := &Provider{
 		ID: id, Model: slug,
 		BaseURL: "https://openrouter.ai/api/v1",
+		APIKey:  apiKey, Format: "openai",
+	}
+
+	if def, ok := getOpenRouterCatalog()[slug]; ok {
+		p.Label = def.Label
+		p.ContextWindow = def.ContextWindow
+		p.SupportsVision = def.Vision
+		p.InputPricePerM = def.InputPricePerM
+		p.OutputPricePerM = def.OutputPricePerM
+	}
+
+	return p, nil
+}
+
+// resolveRequesty builds a Provider for Requesty (https://requesty.ai), an
+// OpenAI-compatible LLM gateway. Like OpenRouter, it accepts vendor/model slugs
+// and is reached through an OpenAI-format endpoint, so the OpenRouter model
+// catalog is reused for labels and pricing metadata.
+func resolveRequesty(id, slug string) (*Provider, error) {
+	apiKey := os.Getenv("REQUESTY_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("REQUESTY_API_KEY not set for model %q", id)
+	}
+
+	p := &Provider{
+		ID: id, Model: slug,
+		BaseURL: "https://router.requesty.ai/v1",
 		APIKey:  apiKey, Format: "openai",
 	}
 

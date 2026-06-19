@@ -132,7 +132,7 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 
 func resolveProvider(cfg *config.Config) (*llm.Provider, error) {
 	if cfg.LLM.Provider == "" {
-		return nil, fmt.Errorf("GOGOGOT_PROVIDER is required — set to 'anthropic', 'openai', or 'openrouter'")
+		return nil, fmt.Errorf("GOGOGOT_PROVIDER is required — set to 'anthropic', 'openai', 'openrouter', or 'requesty'")
 	}
 	if cfg.LLM.Model == "" {
 		return nil, fmt.Errorf("GOGOGOT_MODEL is required — use an exact model ID (e.g. claude-sonnet-4-6, gpt-4o) or an OpenRouter slug (vendor/model)")
