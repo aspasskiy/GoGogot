@@ -3,7 +3,6 @@ package agent
 import (
 	"context"
 	"github.com/aspasskiy/gogogot/internal/core/agent/hook"
-	"github.com/aspasskiy/gogogot/internal/transport"
 	"github.com/aspasskiy/gogogot/internal/llm"
 	llmTypes "github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/tools"
@@ -20,7 +19,6 @@ type Agent struct {
 	loopDetector *hook.LoopDetector
 	beforeHooks  []hook.BeforeIterationFunc
 	afterHooks   []hook.AfterIterationFunc
-	sink         transport.Sink
 }
 
 func New(client llm.LLM, instructions func() string, registry *tools.Registry) *Agent {
@@ -62,12 +60,6 @@ func (a *Agent) AddAfterHook(fn hook.AfterIterationFunc) {
 
 func (a *Agent) ModelLabel() string {
 	return a.client.ModelLabel()
-}
-
-// emit sends an event to the run's sink. The sink (the orchestrator) decides
-// what to persist and what to forward to the UI.
-func (a *Agent) emit(ev transport.Event) {
-	a.sink.Emit(ev)
 }
 
 func (a *Agent) runBeforeHooks(ctx context.Context, ic *hook.IterationContext) {

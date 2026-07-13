@@ -80,13 +80,20 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 		return
 	}
 
-	e.mu.Lock()
-	run := e.active
-	e.mu.Unlock()
+	agentCtx, cancel := context.WithCancel(ctx)
+	run := &activeRun{
+		cancel:     cancel,
+		replyInbox: make(chan string),
+	}
 
-	if run != nil {
+	// Check-and-claim atomically: if a run is already active, hand the message
+	// to it (or report busy) without spawning. Claiming under the same lock hold
+	// as the check is what prevents two dispatches from both starting a run.
+	release, existing, claimed := e.claim(run)
+	if !claimed {
+		cancel()
 		select {
-		case run.replyInbox <- msg.Text:
+		case existing.replyInbox <- msg.Text:
 			return
 		default:
 		}
@@ -95,6 +102,8 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 	}
 
 	if msg.Text == "" && len(msg.Attachments) == 0 {
+		release()
+		cancel()
 		return
 	}
 
@@ -103,7 +112,7 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 		Int("attachments", len(msg.Attachments)).
 		Msg("engine: incoming message")
 
-	go e.runAgent(ctx, msg)
+	go e.runAgent(ctx, agentCtx, msg, run, release)
 }
 
 func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
@@ -138,30 +147,33 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	}
 }
 
-// setActive marks the engine as busy and returns a release function.
-// Caller must defer the release.
-func (e *Engine) setActive(run *activeRun) func() {
+// claim atomically registers run as the active run if the engine is idle.
+// On success it returns a release function (which the caller must defer) and
+// claimed=true. If a run is already active it returns that run as existing and
+// claimed=false, having claimed nothing. The check and the claim happen under a
+// single lock hold, so two callers can never both observe an idle engine.
+func (e *Engine) claim(run *activeRun) (release func(), existing *activeRun, claimed bool) {
 	e.mu.Lock()
+	defer e.mu.Unlock()
+	if e.active != nil {
+		return nil, e.active, false
+	}
 	e.active = run
-	e.mu.Unlock()
 	return func() {
 		e.mu.Lock()
 		e.active = nil
 		e.mu.Unlock()
-	}
+	}, nil, true
 }
 
-func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
+// runAgent drives one already-claimed run to completion. ctx is the parent
+// context (used for sends that must survive cancellation); agentCtx is the
+// cancellable run context. release frees the engine's active slot.
+func (e *Engine) runAgent(ctx, agentCtx context.Context, msg channel.Message, run *activeRun, release func()) {
+	defer release()
+	defer run.cancel()
+
 	reply := msg.Reply
-
-	agentCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	run := &activeRun{
-		cancel:     cancel,
-		replyInbox: make(chan string),
-	}
-	defer e.setActive(run)()
 
 	bus, recv := transport.NewBus(64)
 
@@ -218,19 +230,20 @@ func (e *Engine) stopAgent(cmd *channel.Command) {
 // If the agent is already busy, it returns an error so the scheduler can
 // apply backoff and retry later.
 func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, taskID, command, skill string) (string, error) {
-	e.mu.Lock()
-	busy := e.active != nil
-	e.mu.Unlock()
-	if busy {
-		return "", fmt.Errorf("agent busy, will retry")
-	}
-
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	agentCtx = transport.WithReplier(agentCtx, reply)
 
+	// Atomic check-and-claim: the scheduler fires on its own goroutine, fully
+	// parallel to the Telegram worker, so a non-atomic busy check here would let
+	// a scheduled task and a chat message both start runs at once.
 	run := &activeRun{cancel: cancel, replyInbox: make(chan string)}
-	defer e.setActive(run)()
+	release, _, claimed := e.claim(run)
+	if !claimed {
+		return "", fmt.Errorf("agent busy, will retry")
+	}
+	defer release()
+
+	agentCtx = transport.WithReplier(agentCtx, reply)
 
 	bus, recv := transport.NewBus(64)
 
