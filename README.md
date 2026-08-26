@@ -1,4 +1,4 @@
-![GoGogot](https://octagon-lab.sfo3.cdn.digitaloceanspaces.com/gogogot.jpg)
+![GoGogot](https://octagon-lab.sfo3.cdn.digitaloceanspaces.com/gogogot-banner.png)
 
 # GoGogot — Lightweight OpenClaw Written in Go
 
