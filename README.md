@@ -82,10 +82,11 @@ Set `GOGOGOT_PROVIDER`, `GOGOGOT_MODEL`, and the corresponding API key. The agen
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5` |
 | OpenAI | `openai` | `OPENAI_API_KEY` | `gpt-5.4`, `gpt-5.1`, `gpt-4.1`, `o3`, `o4-mini` |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | `qwen/qwen3.7-max`, `deepseek/deepseek-v4-flash`, `x-ai/grok-build-0.1` |
+| Requesty | `requesty` | `REQUESTY_API_KEY` | `openai/gpt-4o-mini`, `anthropic/claude-sonnet-4-5`, `deepseek/deepseek-chat` |
 
 Model metadata (context window, vision support, pricing) is stored in JSON catalogs under [`llm/catalog/`](internal/llm/catalog/) — just edit the JSON to add or update models.
 
-With OpenRouter you can also pass any slug directly, e.g. `GOGOGOT_MODEL=moonshotai/kimi-k2.5`.
+With OpenRouter or Requesty you can also pass any slug directly, e.g. `GOGOGOT_MODEL=moonshotai/kimi-k2.5`.
 
 ### Short Aliases
 
