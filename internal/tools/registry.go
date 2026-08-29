@@ -21,7 +21,7 @@ type Registry struct {
 // ChatSearchFunc searches past chats by semantic relevance.
 type ChatSearchFunc = store.ChatSearchFunc
 
-func NewRegistry(st store.Store, braveAPIKey string, searchFn ChatSearchFunc, extra ...types.Tool) *Registry {
+func NewRegistry(st store.Store, braveAPIKey, tavilyAPIKey string, searchFn ChatSearchFunc, extra ...types.Tool) *Registry {
 	all := []types.Tool{
 		systemtools.BashTool(),
 		systemtools.EditFileTool(),
@@ -30,6 +30,9 @@ func NewRegistry(st store.Store, braveAPIKey string, searchFn ChatSearchFunc, ex
 	}
 	all = append(all, systemtools.FileTools()...)
 	all = append(all, webtools.WebSearchTool(braveAPIKey))
+	if tavilyAPIKey != "" {
+		all = append(all, webtools.TavilySearchTool(tavilyAPIKey))
+	}
 	all = append(all, webtools.WebFetchTool())
 	all = append(all, webtools.WebRequestTool())
 	all = append(all, webtools.WebDownloadTool())

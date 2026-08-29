@@ -100,7 +100,7 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 	client := llm.NewClient(*provider, nil)
 	chatMgr := chat.NewManager(st, client)
 
-	reg := tools.NewRegistry(st, cfg.BraveAPIKey, chatMgr.SearchRelevant, extra...)
+	reg := tools.NewRegistry(st, cfg.BraveAPIKey, cfg.TavilyAPIKey, chatMgr.SearchRelevant, extra...)
 	client.SetTools(reg.Definitions())
 
 	transportName := ch.Name()

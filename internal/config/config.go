@@ -29,7 +29,8 @@ type Config struct {
 	Transport   string // "telegram" (default), "tui", "http", "slack", ...
 	DataDir     string
 	LogLevel    string
-	BraveAPIKey string
+	BraveAPIKey  string
+	TavilyAPIKey string
 
 	Telegram  TelegramConfig
 	LLM       LLMConfig
@@ -51,7 +52,8 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Transport:   transport,
-		BraveAPIKey: os.Getenv("BRAVE_API_KEY"),
+		BraveAPIKey:  os.Getenv("BRAVE_API_KEY"),
+		TavilyAPIKey: os.Getenv("TAVILY_API_KEY"),
 		DataDir:     os.Getenv("GOGOGOT_DATA_DIR"),
 		LogLevel:    envDefault("LOG_LEVEL", "debug"),
 
