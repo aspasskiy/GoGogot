@@ -362,6 +362,27 @@ def _flush_group(group_id):
         inbound.submit(forward, msgs)
 
 
+def mark_answered(cb):
+    """Replace the question's buttons with the choice, so it reads as answered
+    and cannot be pressed twice."""
+    msg = cb.get("message") or {}
+    if not msg.get("message_id"):
+        return
+    rows = (msg.get("reply_markup") or {}).get("inline_keyboard") or []
+    label = next(
+        (b.get("text") for row in rows for b in row if b.get("callback_data") == cb.get("data")),
+        cb.get("data", ""),
+    )
+    try:
+        api("editMessageText", {
+            "chat_id": msg["chat"]["id"],
+            "message_id": msg["message_id"],
+            "text": f"{msg.get('text', '')}\n→ {label}",
+        })
+    except Exception as e:
+        log(f"mark answered: {e}")
+
+
 def handle_update(u):
     cb = u.get("callback_query")
     if cb:
@@ -371,6 +392,7 @@ def handle_update(u):
             api("answerCallbackQuery", {"callback_query_id": cb["id"]})
         except Exception as e:
             log(f"answerCallbackQuery: {e}")
+        mark_answered(cb)
         chat = ((cb.get("message") or {}).get("chat") or {}).get("id", cb["from"]["id"])
         emit({"event": "message", "chat": str(chat), "sender": str(cb["from"]["id"]), "text": cb.get("data", "")})
         return

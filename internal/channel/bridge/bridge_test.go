@@ -230,9 +230,15 @@ func TestTelegramBridge(t *testing.T) {
 		t.Errorf("ask keyboard = %s", kb)
 	}
 	api.push(map[string]any{"callback_query": map[string]any{"id": "cb1", "from": owner, "data": "c",
-		"message": map[string]any{"message_id": 5, "chat": chat}}})
+		"message": map[string]any{"message_id": 5, "chat": chat, "text": "❓ Which?",
+			"reply_markup": map[string]any{"inline_keyboard": [][]map[string]any{{{"text": "C", "callback_data": "c"}}}}}}})
 	if msg := waitMessage(t, msgs); msg.Text != "c" {
 		t.Errorf("button press = %q, want c", msg.Text)
+	}
+	// The question then reads as answered, without buttons to press again.
+	answered, next := api.waitCall(t, "editMessageText", next)
+	if answered.Params["text"] != "❓ Which?\n→ C" || answered.Params["reply_markup"] != nil {
+		t.Errorf("answered question = %v", answered.Params)
 	}
 
 	// Photos are downloaded into the inbox and arrive as attachments.
@@ -242,6 +248,15 @@ func TestTelegramBridge(t *testing.T) {
 	if msg.Text != "look" || len(msg.Attachments) != 1 || string(msg.Attachments[0].Data) != "JPEGDATA" ||
 		msg.Attachments[0].MimeType != "image/jpeg" {
 		t.Errorf("photo message = %q with %+v", msg.Text, msg.Attachments)
+	}
+
+	// An album arrives as one message with every photo.
+	for i, id := range []string{"p1", "p2"} {
+		api.push(map[string]any{"message": map[string]any{"message_id": 10 + i, "from": owner, "chat": chat,
+			"media_group_id": "album", "photo": []map[string]any{{"file_id": id, "file_size": 8}}}})
+	}
+	if msg := waitMessage(t, msgs); len(msg.Attachments) != 2 {
+		t.Errorf("album = %d attachments, want 2", len(msg.Attachments))
 	}
 
 	// Commands are answered by the core.
