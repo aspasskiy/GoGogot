@@ -64,6 +64,10 @@ func (a *Adapter) Call(
 }
 
 func isReasoningModel(model string) bool {
+	// gpt-5, gpt-5-mini, gpt-5.4, gpt-5.6-luna, … all reject max_tokens.
+	if strings.HasPrefix(model, "gpt-5") {
+		return true
+	}
 	for _, prefix := range []string{"o1", "o3", "o4"} {
 		if model == prefix || strings.HasPrefix(model, prefix+"-") {
 			return true

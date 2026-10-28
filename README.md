@@ -80,7 +80,7 @@ Set `GOGOGOT_PROVIDER`, `GOGOGOT_MODEL`, and the corresponding API key. The agen
 | Provider | `GOGOGOT_PROVIDER` | API key env | Example `GOGOGOT_MODEL` |
 |---|---|---|---|
 | Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5` |
-| OpenAI | `openai` | `OPENAI_API_KEY` | `gpt-5.4`, `gpt-5.1`, `gpt-4.1`, `o3`, `o4-mini` |
+| OpenAI | `openai` | `OPENAI_API_KEY` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4-mini` |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | `qwen/qwen3.7-max`, `deepseek/deepseek-v4-flash`, `x-ai/grok-build-0.1` |
 
 Model metadata (context window, vision support, pricing) is stored in JSON catalogs under [`llm/catalog/`](internal/llm/catalog/) — just edit the JSON to add or update models.
@@ -91,19 +91,40 @@ With OpenRouter you can also pass any slug directly, e.g. `GOGOGOT_MODEL=moonsho
 
 For convenience, short aliases are supported as `GOGOGOT_MODEL` values:
 
-| Alias | Resolves to |
-|---|---|
-| `claude` | `claude-sonnet-4-6` |
-| `openai` | `openai/gpt-5-nano` |
-| `deepseek` | `deepseek/deepseek-v4-flash` |
-| `gemini` | `google/gemini-3-flash-preview` |
-| `grok` | `x-ai/grok-build-0.1` |
-| `llama` | `meta-llama/llama-4-maverick` |
-| `qwen` | `qwen/qwen3.7-max` |
-| `minimax` | `minimax/minimax-m2.5` |
-| `kimi` | `moonshotai/kimi-k2.5` |
+| Alias | Resolves to | PinchBench avg |
+|---|---|---|
+| `qwen` | `qwen/qwen3.7-max` | 92.5% |
+| `grok` | `x-ai/grok-build-0.1` | 88.9% |
+| `deepseek` | `deepseek/deepseek-v4-flash` | 81.7% |
+| `gemini` | `google/gemini-3-flash-preview` | 72.1% |
+| `claude` | `claude-sonnet-4-6` | 62.7% |
+| `kimi` | `moonshotai/kimi-k2.5` | 54.6% |
+| `openai` | `openai/gpt-5-nano` | — |
+| `llama` | `meta-llama/llama-4-maverick` | — |
+| `minimax` | `minimax/minimax-m2.5` | — |
 
-Browse all available models: [Anthropic](https://platform.claude.com/docs/en/about-claude/models/overview) | [OpenAI](https://platform.openai.com/docs/models) | [OpenRouter](https://openrouter.ai/models) | Benchmarks: [PinchBench](https://pinchbench.com/)
+`—` means the model is not on the PinchBench leaderboard.
+
+### Benchmarks
+
+[PinchBench](https://pinchbench.com/) runs models through standardized agent tasks in the OpenClaw harness (147 tasks, graded by automated checks and an LLM judge). It measures the *model*, not GoGogot, but it's a good proxy for how well a model drives a tool-calling agent loop like this one. Top 10 (PinchBench v2, snapshot of 2026-10-28):
+
+| # | Model | Avg score | Runs | Avg cost per full run |
+|---|---|---|---|---|
+| 1 | `anthropic/claude-opus-4.8-fast` | 93.5% | 5 | $165.36 |
+| 2 | `qwen/qwen3.7-max` | 92.5% | 6 | $20.51 |
+| 3 | `anthropic/claude-opus-4.8` | 90.5% | 5 | $81.79 |
+| 4 | `nvidia/nemotron-3.5-bolt-74b-a9b-bf16` | 90.4% | 10 | $0 (reported) |
+| 5 | `nvidia/nemotron-3-ultra-550b-a55b` | 89.9% | 5 | $0 (reported) |
+| 6 | `xiaomi/mimo-v2.5` | 89.7% | 6 | $6.23 |
+| 7 | `x-ai/grok-build-0.1` | 88.9% | 5 | $20.58 |
+| 8 | `openai/gpt-5.6-luna` | 88.7% | 5 | $17.14 |
+| 9 | `qwen/qwen3.6-flash` | 88.1% | 5 | $14.29 |
+| 10 | `nvidia/nemotron-3.5-bolt-74b-a9b-24gb` | 87.8% | 10 | $0 (reported) |
+
+Budget picks: `deepseek/deepseek-v4-flash` (81.7%, ~$1.44 per run) and `stepfun/step-3.5-flash` (79.4%, ~$1.12 per run). Scores are averages over all runs; see [pinchbench.com](https://pinchbench.com/) for the full table of 61 models.
+
+Browse all available models: [Anthropic](https://platform.claude.com/docs/en/about-claude/models/overview) | [OpenAI](https://platform.openai.com/docs/models) | [OpenRouter](https://openrouter.ai/models)
 
 ## Features
 
