@@ -2,11 +2,12 @@ package llm
 
 import (
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/llm/catalog"
 	"os"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/llm/catalog"
 )
 
 type Provider struct {

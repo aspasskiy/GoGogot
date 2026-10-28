@@ -3,9 +3,10 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/aspasskiy/gogogot/internal/channel"
 	"github.com/aspasskiy/gogogot/internal/transport"
-	"strings"
 
 	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"

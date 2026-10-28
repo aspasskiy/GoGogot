@@ -2,10 +2,11 @@ package local
 
 import (
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/store"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/store"
 )
 
 func (s *LocalStore) ListMemory() ([]store.MemoryFile, error) {

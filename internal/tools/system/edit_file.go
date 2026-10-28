@@ -3,9 +3,10 @@ package system
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"os"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 )
 
 func EditFileTool() types.Tool {
@@ -13,7 +14,7 @@ func EditFileTool() types.Tool {
 		Name:        "edit_file",
 		Label:       "Editing file",
 		Description: "Edit a file by replacing a specific string with a new one. Safer than write_file for modifying configs — only the matched portion changes. Returns error if old_string is not found.",
-		DetailFunc: pathDetail,
+		DetailFunc:  pathDetail,
 		Parameters: map[string]any{
 			"path": map[string]any{
 				"type":        "string",

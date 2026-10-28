@@ -2,8 +2,9 @@ package telegram
 
 import (
 	"context"
-	"github.com/aspasskiy/gogogot/internal/transport"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 const (

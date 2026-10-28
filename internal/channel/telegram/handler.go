@@ -2,8 +2,9 @@ package telegram
 
 import (
 	"context"
-	"github.com/aspasskiy/gogogot/internal/channel"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/channel"
 
 	"github.com/go-telegram/bot/models"
 	"github.com/rs/zerolog/log"

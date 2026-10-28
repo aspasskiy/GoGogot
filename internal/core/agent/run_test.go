@@ -6,19 +6,19 @@ import (
 	"fmt"
 	"testing"
 
-	types "github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
 	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 // fakeLLM returns canned responses in order, with no network or provider.
 type fakeLLM struct {
-	responses []*types.Response
+	responses []*domain.Response
 	idx       int
 	calls     int
 }
 
-func (f *fakeLLM) Call(_ context.Context, _ []types.Message, _ llm.CallOptions) (*types.Response, error) {
+func (f *fakeLLM) Call(_ context.Context, _ []domain.Message, _ llm.CallOptions) (*domain.Response, error) {
 	f.calls++
 	r := f.responses[f.idx]
 	f.idx++
@@ -41,17 +41,17 @@ func (c *captureSink) Emit(ev transport.Event) { c.events = append(c.events, ev)
 // run, driven by a fake LLM and a local tool, produces a fully typed event
 // stream into a plain sink — with no store, no disk, and no channel involved.
 func TestRunEmitsEventSequenceWithoutStore(t *testing.T) {
-	fake := &fakeLLM{responses: []*types.Response{
+	fake := &fakeLLM{responses: []*domain.Response{
 		{ // iteration 1: call the local report_status tool
-			Content: []types.ContentBlock{
-				types.ToolUseBlock("call_1", "report_status", json.RawMessage(`{"text":"working"}`)),
+			Content: []domain.ContentBlock{
+				domain.ToolUseBlock("call_1", "report_status", json.RawMessage(`{"text":"working"}`)),
 			},
 			StopReason:   "tool_use",
 			InputTokens:  10,
 			OutputTokens: 5,
 		},
 		{ // iteration 2: final text, no tools -> loop ends
-			Content:      []types.ContentBlock{types.TextBlock("done")},
+			Content:      []domain.ContentBlock{domain.TextBlock("done")},
 			StopReason:   "end_turn",
 			InputTokens:  8,
 			OutputTokens: 3,
@@ -64,7 +64,7 @@ func TestRunEmitsEventSequenceWithoutStore(t *testing.T) {
 	sink := &captureSink{}
 
 	input := RunInput{
-		UserBlocks: []types.ContentBlock{types.TextBlock("hello")},
+		UserBlocks: []domain.ContentBlock{domain.TextBlock("hello")},
 	}
 	if err := ag.Run(context.Background(), input, sink); err != nil {
 		t.Fatalf("Run returned error: %v", err)
@@ -106,10 +106,10 @@ func TestRunEmitsEventSequenceWithoutStore(t *testing.T) {
 	if !ok {
 		t.Fatalf("event[0] is %T, want MessageEvent", sink.events[0])
 	}
-	if userMsg.Turn.Role != string(types.RoleUser) {
-		t.Errorf("user turn role = %q, want %q", userMsg.Turn.Role, types.RoleUser)
+	if userMsg.Turn.Role != string(domain.RoleUser) {
+		t.Errorf("user turn role = %q, want %q", userMsg.Turn.Role, domain.RoleUser)
 	}
-	if got := types.ExtractText(userMsg.Turn.Content); got != "hello" {
+	if got := domain.ExtractText(userMsg.Turn.Content); got != "hello" {
 		t.Errorf("user turn text = %q, want %q", got, "hello")
 	}
 	if !userMsg.Persistent() {
@@ -118,8 +118,8 @@ func TestRunEmitsEventSequenceWithoutStore(t *testing.T) {
 
 	// The tool-result turn carries the report_status output.
 	toolMsg := sink.events[6].(transport.MessageEvent)
-	if toolMsg.Turn.Role != string(types.RoleUser) {
-		t.Errorf("tool-result turn role = %q, want %q", toolMsg.Turn.Role, types.RoleUser)
+	if toolMsg.Turn.Role != string(domain.RoleUser) {
+		t.Errorf("tool-result turn role = %q, want %q", toolMsg.Turn.Role, domain.RoleUser)
 	}
 
 	// The terminal event is Done and is non-persistent.

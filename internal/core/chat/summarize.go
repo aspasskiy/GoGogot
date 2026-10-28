@@ -7,10 +7,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aspasskiy/gogogot/internal/utils"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
-	types "github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
+	"github.com/aspasskiy/gogogot/internal/utils"
 
 	"github.com/rs/zerolog/log"
 )
@@ -92,8 +92,8 @@ func (m *Manager) summarize(ctx context.Context, ch *store.Chat) {
 		"\n\nPreserve: key decisions, outcomes, important facts, action items.\n\n---\n\n" +
 		transcript.String()
 
-	resp, err := m.llm.Call(ctx, []types.Message{
-		types.NewUserMessage(types.TextBlock(prompt)),
+	resp, err := m.llm.Call(ctx, []domain.Message{
+		domain.NewUserMessage(domain.TextBlock(prompt)),
 	}, llm.CallOptions{
 		System:    "You summarize conversations into structured JSON. Be concise and accurate.",
 		NoTools:   true,
@@ -108,7 +108,7 @@ func (m *Manager) summarize(ctx context.Context, ch *store.Chat) {
 		return
 	}
 
-	text := types.ExtractText(resp.Content)
+	text := domain.ExtractText(resp.Content)
 	result := parseSummaryJSON(text)
 	if result.Title != "" {
 		ch.Title = result.Title

@@ -2,14 +2,15 @@ package local
 
 import (
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/store"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 )
 
-func (s *LocalStore) LoadSkills() ([]store.Skill, error) {
+func (s *LocalStore) LoadSkills() ([]domain.Skill, error) {
 	return loadSkillsFromDir(s.SkillsDir())
 }
 
@@ -64,7 +65,7 @@ func (s *LocalStore) ReadSkill(name string) (string, error) {
 
 // --- helpers ---
 
-func loadSkillsFromDir(rootDir string) ([]store.Skill, error) {
+func loadSkillsFromDir(rootDir string) ([]domain.Skill, error) {
 	entries, err := os.ReadDir(rootDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -73,7 +74,7 @@ func loadSkillsFromDir(rootDir string) ([]store.Skill, error) {
 		return nil, err
 	}
 
-	var out []store.Skill
+	var out []domain.Skill
 	for _, e := range entries {
 		if !e.IsDir() {
 			continue
@@ -87,7 +88,7 @@ func loadSkillsFromDir(rootDir string) ([]store.Skill, error) {
 		if name == "" {
 			name = e.Name()
 		}
-		out = append(out, store.Skill{
+		out = append(out, domain.Skill{
 			Name:        name,
 			Description: desc,
 			FilePath:    skillMd,

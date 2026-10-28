@@ -3,8 +3,6 @@ package web
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/utils"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +10,9 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/utils"
 )
 
 const (
@@ -21,8 +22,8 @@ const (
 
 func WebDownloadTool() types.Tool {
 	return types.Tool{
-		Name:  "web_download",
-		Label: "Downloading",
+		Name:        "web_download",
+		Label:       "Downloading",
 		Description: "Download a file from a URL and save it to disk. Use for fetching PDFs, images, archives, binaries, or any file. Max size 100 MB. If path is omitted, saves to /tmp with filename from URL.",
 		Parameters: map[string]any{
 			"url": map[string]any{

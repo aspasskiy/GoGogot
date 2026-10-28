@@ -2,7 +2,8 @@ package tools
 
 import (
 	"context"
-	llmtypes "github.com/aspasskiy/gogogot/internal/domain"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
 	"github.com/aspasskiy/gogogot/internal/tools/memory"
 	"github.com/aspasskiy/gogogot/internal/tools/recall"
@@ -18,10 +19,7 @@ type Registry struct {
 	tt map[string]types.Tool
 }
 
-// ChatSearchFunc searches past chats by semantic relevance.
-type ChatSearchFunc = store.ChatSearchFunc
-
-func NewRegistry(st store.Store, braveAPIKey string, searchFn ChatSearchFunc, extra ...types.Tool) *Registry {
+func NewRegistry(st store.Store, braveAPIKey string, searchFn domain.ChatSearchFunc, extra ...types.Tool) *Registry {
 	all := []types.Tool{
 		systemtools.BashTool(),
 		systemtools.EditFileTool(),
@@ -54,10 +52,10 @@ func (r *Registry) Execute(ctx context.Context, name string, input map[string]an
 	return t.Handler(ctx, input)
 }
 
-func (r *Registry) Definitions() []llmtypes.ToolDef {
-	out := make([]llmtypes.ToolDef, 0, len(r.tt))
+func (r *Registry) Definitions() []domain.ToolDef {
+	out := make([]domain.ToolDef, 0, len(r.tt))
 	for _, t := range r.tt {
-		out = append(out, llmtypes.ToolDef{
+		out = append(out, domain.ToolDef{
 			Name:        t.Name,
 			Description: t.Description,
 			Parameters:  t.Parameters,

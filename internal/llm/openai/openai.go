@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	types "github.com/aspasskiy/gogogot/internal/domain"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
@@ -33,10 +34,10 @@ func (a *Adapter) Call(
 	ctx context.Context,
 	model string,
 	systemPrompt string,
-	messages []types.Message,
-	tools []types.ToolDef,
+	messages []domain.Message,
+	tools []domain.ToolDef,
 	maxTokens int,
-) (*types.Response, error) {
+) (*domain.Response, error) {
 	reasoning := isReasoningModel(model)
 	oaiMsgs := messagesToOpenAI(a.supportsVision, reasoning, systemPrompt, messages)
 	oaiTools := toolDefsToOpenAI(tools)
@@ -76,7 +77,7 @@ func isReasoningModel(model string) bool {
 	return false
 }
 
-func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []types.Message) []openai.ChatCompletionMessageParamUnion {
+func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []domain.Message) []openai.ChatCompletionMessageParamUnion {
 	var out []openai.ChatCompletionMessageParamUnion
 
 	if system != "" {
@@ -89,7 +90,7 @@ func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []type
 
 	for _, msg := range msgs {
 		switch msg.Role {
-		case types.RoleUser:
+		case domain.RoleUser:
 			var parts []openai.ChatCompletionContentPartUnionParam
 			var toolResults []openai.ChatCompletionMessageParamUnion
 			hasImage := false
@@ -97,10 +98,10 @@ func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []type
 
 			for _, b := range msg.Content {
 				switch b.Type {
-				case "text":
+				case domain.BlockText:
 					parts = append(parts, openai.TextContentPart(b.Text))
 					textOnly += b.Text
-				case "image":
+				case domain.BlockImage:
 					if supportsVision {
 						hasImage = true
 						dataURL := fmt.Sprintf("data:%s;base64,%s", b.MimeType, b.ImageData)
@@ -112,7 +113,7 @@ func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []type
 						parts = append(parts, openai.TextContentPart(placeholder))
 						textOnly += placeholder + "\n"
 					}
-				case "tool_result":
+				case domain.BlockToolResult:
 					toolResults = append(toolResults, openai.ToolMessage(b.ToolOutput, b.ToolUseID))
 				}
 			}
@@ -126,15 +127,15 @@ func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []type
 			}
 			out = append(out, toolResults...)
 
-		case types.RoleAssistant:
+		case domain.RoleAssistant:
 			var text string
 			var toolCalls []openai.ChatCompletionMessageToolCallParam
 
 			for _, b := range msg.Content {
 				switch b.Type {
-				case "text":
+				case domain.BlockText:
 					text += b.Text
-				case "tool_use":
+				case domain.BlockToolUse:
 					toolCalls = append(toolCalls, openai.ChatCompletionMessageToolCallParam{
 						ID: b.ToolUseID,
 						Function: openai.ChatCompletionMessageToolCallFunctionParam{
@@ -159,7 +160,7 @@ func messagesToOpenAI(supportsVision, reasoning bool, system string, msgs []type
 	return out
 }
 
-func toolDefsToOpenAI(defs []types.ToolDef) []openai.ChatCompletionToolParam {
+func toolDefsToOpenAI(defs []domain.ToolDef) []openai.ChatCompletionToolParam {
 	var out []openai.ChatCompletionToolParam
 	for _, d := range defs {
 		params := shared.FunctionParameters{
@@ -182,8 +183,8 @@ func toolDefsToOpenAI(defs []types.ToolDef) []openai.ChatCompletionToolParam {
 	return out
 }
 
-func openaiToResponse(resp *openai.ChatCompletion) *types.Response {
-	r := &types.Response{
+func openaiToResponse(resp *openai.ChatCompletion) *domain.Response {
+	r := &domain.Response{
 		ID:           resp.ID,
 		InputTokens:  int(resp.Usage.PromptTokens),
 		OutputTokens: int(resp.Usage.CompletionTokens),
@@ -208,11 +209,11 @@ func openaiToResponse(resp *openai.ChatCompletion) *types.Response {
 	}
 
 	if choice.Message.Content != "" {
-		r.Content = append(r.Content, types.TextBlock(choice.Message.Content))
+		r.Content = append(r.Content, domain.TextBlock(choice.Message.Content))
 	}
 
 	for _, tc := range choice.Message.ToolCalls {
-		r.Content = append(r.Content, types.ToolUseBlock(
+		r.Content = append(r.Content, domain.ToolUseBlock(
 			tc.ID,
 			tc.Function.Name,
 			json.RawMessage(tc.Function.Arguments),

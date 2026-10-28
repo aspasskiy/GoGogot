@@ -3,9 +3,10 @@ package hook
 import (
 	"encoding/json"
 	"fmt"
-	types "github.com/aspasskiy/gogogot/internal/domain"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 )
 
 func CalcCost(inputPerM, outputPerM float64, inputTokens, outputTokens int) float64 {
@@ -26,10 +27,10 @@ func formatDuration(d time.Duration) string {
 	}
 }
 
-func textFromBlocks(blocks []types.ContentBlock) string {
+func textFromBlocks(blocks []domain.ContentBlock) string {
 	var sb strings.Builder
 	for _, b := range blocks {
-		if b.Type == "text" && b.Text != "" {
+		if b.Type == domain.BlockText && b.Text != "" {
 			if sb.Len() > 0 {
 				sb.WriteByte(' ')
 			}
@@ -41,22 +42,22 @@ func textFromBlocks(blocks []types.ContentBlock) string {
 
 const separator = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-func formatBlocksFull(blocks []types.ContentBlock) string {
+func formatBlocksFull(blocks []domain.ContentBlock) string {
 	var sb strings.Builder
 	for _, b := range blocks {
 		switch b.Type {
-		case "text":
+		case domain.BlockText:
 			sb.WriteString(b.Text)
 			sb.WriteByte('\n')
-		case "image":
+		case domain.BlockImage:
 			fmt.Fprintf(&sb, "[image %s, %d bytes]\n", b.MimeType, len(b.ImageData))
-		case "tool_use":
+		case domain.BlockToolUse:
 			pretty, err := json.MarshalIndent(json.RawMessage(b.ToolInput), "  ", "  ")
 			if err != nil {
 				pretty = b.ToolInput
 			}
 			fmt.Fprintf(&sb, "[tool_use: %s]\n  %s\n", b.ToolName, pretty)
-		case "tool_result":
+		case domain.BlockToolResult:
 			errTag := ""
 			if b.ToolIsErr {
 				errTag = " ERROR"

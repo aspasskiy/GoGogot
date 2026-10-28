@@ -39,8 +39,8 @@ type Tool struct {
 	Required    []string
 	Handler     Handler
 
-	Interactive bool                           // agent loop handles user interaction; handler is skipped
-	Phase       string                         // UI phase override (e.g. "planning"); empty = default "tool"
+	Interactive bool                              // agent loop handles user interaction; handler is skipped
+	Phase       string                            // UI phase override (e.g. "planning"); empty = default "tool"
 	DetailFunc  func(input map[string]any) string // extracts short context from input for UI display
 }
 

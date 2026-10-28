@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/aspasskiy/gogogot/internal/core/agent/hook"
-	types "github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
 	tooltypes "github.com/aspasskiy/gogogot/internal/tools/types"
 	"github.com/aspasskiy/gogogot/internal/transport"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -19,8 +20,8 @@ import (
 // emits every turn it produces — starting with the user turn — as a
 // MessageEvent, leaving persistence entirely to the sink.
 type RunInput struct {
-	Messages   []types.Turn
-	UserBlocks []types.ContentBlock
+	Messages   []domain.Turn
+	UserBlocks []domain.ContentBlock
 }
 
 // Run executes the agent loop synchronously, emitting typed events to the sink.
@@ -37,18 +38,18 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 
 	// The new user message is persisted like any other turn — the orchestrator
 	// writes it when it sees this event.
-	userTurn := types.Turn{
-		Role:      string(types.RoleUser),
+	userTurn := domain.Turn{
+		Role:      string(domain.RoleUser),
 		Content:   input.UserBlocks,
 		Timestamp: time.Now(),
 	}
 	a.emit(transport.MessageEvent{Turn: userTurn})
 
-	msgs := make([]types.Turn, 0, len(input.Messages)+1)
+	msgs := make([]domain.Turn, 0, len(input.Messages)+1)
 	msgs = append(msgs, input.Messages...)
 	msgs = append(msgs, userTurn)
 
-	var total types.Usage
+	var total domain.Usage
 	var finalText string // last assistant text produced; reported in DoneEvent
 	var toolCallCounter int
 
@@ -76,7 +77,7 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		if iterCtx.Compacted {
 			msgs = iterCtx.Messages
 			a.emit(transport.CompactionEvent{
-				Messages:     append([]types.Turn(nil), msgs...), // copy: the sink takes ownership
+				Messages:     append([]domain.Turn(nil), msgs...), // copy: the sink takes ownership
 				BeforeTokens: tokensBefore,
 				AfterTokens:  hook.EstimateTokens(msgs),
 			})
@@ -104,8 +105,8 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 
 		parsed := parseResponseBlocks(resp.Content)
 
-		assistantTurn := types.Turn{
-			Role:      string(types.RoleAssistant),
+		assistantTurn := domain.Turn{
+			Role:      string(domain.RoleAssistant),
 			Content:   parsed.assistantBlocks,
 			Timestamp: time.Now(),
 		}
@@ -134,8 +135,8 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		toolResults, summaries := a.executeToolCallLoop(ctx, parsed.toolCalls, &toolCallCounter)
 		result.ToolCalls = summaries
 
-		toolTurn := types.Turn{
-			Role:      string(types.RoleUser),
+		toolTurn := domain.Turn{
+			Role:      string(domain.RoleUser),
 			Content:   toolResults,
 			Timestamp: time.Now(),
 		}
@@ -162,8 +163,8 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 
 const maxDetailLen = 60
 
-func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []types.ContentBlock, counter *int) ([]types.ContentBlock, []hook.ToolCallSummary) {
-	results := make([]types.ContentBlock, 0, len(toolCalls))
+func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []domain.ContentBlock, counter *int) ([]domain.ContentBlock, []hook.ToolCallSummary) {
+	results := make([]domain.ContentBlock, 0, len(toolCalls))
 	summaries := make([]hook.ToolCallSummary, 0, len(toolCalls))
 
 	toolCtx := transport.WithSink(ctx, a.sink)
@@ -196,7 +197,7 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []types.Conte
 			a.emit(transport.LoopWarningEvent{
 				Name: tc.ToolName, Reason: err.Error(),
 			})
-			results = append(results, types.ToolResultBlock(tc.ToolUseID, err.Error(), true))
+			results = append(results, domain.ToolResultBlock(tc.ToolUseID, err.Error(), true))
 			summaries = append(summaries, hook.ToolCallSummary{Name: tc.ToolName, IsErr: true})
 			continue
 		}
@@ -209,7 +210,7 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []types.Conte
 				output = err.Error()
 			}
 			a.emit(transport.ToolEndEvent{Name: tc.ToolName, Result: output})
-			results = append(results, types.ToolResultBlock(tc.ToolUseID, output, isErr))
+			results = append(results, domain.ToolResultBlock(tc.ToolUseID, output, isErr))
 			summaries = append(summaries, hook.ToolCallSummary{Name: tc.ToolName, Duration: 0, IsErr: isErr})
 			continue
 		}
@@ -222,7 +223,7 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []types.Conte
 			Name: tc.ToolName, Result: toolResult.Output, DurationMs: elapsed.Milliseconds(),
 		})
 
-		results = append(results, types.ToolResultBlock(tc.ToolUseID, toolResult.Output, toolResult.IsErr))
+		results = append(results, domain.ToolResultBlock(tc.ToolUseID, toolResult.Output, toolResult.IsErr))
 		summaries = append(summaries, hook.ToolCallSummary{Name: tc.ToolName, Duration: elapsed, IsErr: toolResult.IsErr})
 	}
 

@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/transport"
-	"github.com/aspasskiy/gogogot/internal/utils"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/transport"
+	"github.com/aspasskiy/gogogot/internal/utils"
 
 	"github.com/go-telegram/bot/models"
 )

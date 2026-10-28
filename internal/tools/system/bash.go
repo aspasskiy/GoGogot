@@ -2,11 +2,12 @@ package system
 
 import (
 	"context"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"os/exec"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 
 	"github.com/rs/zerolog/log"
 )

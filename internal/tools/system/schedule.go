@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/aspasskiy/gogogot/internal/scheduler"
 	"github.com/aspasskiy/gogogot/internal/tools/types"
 )
@@ -11,8 +12,8 @@ import (
 func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 	return []types.Tool{
 		{
-			Name:  "schedule_add",
-			Label: "Scheduling task",
+			Name:        "schedule_add",
+			Label:       "Scheduling task",
 			Description: "Add or update a recurring scheduled task. When the task fires, YOU wake up with full access to all your tools, memory, and skills to execute the command. Persists across restarts. Use standard 5-field cron: min hour dom month dow.",
 			Parameters: map[string]any{
 				"id": map[string]any{
@@ -66,8 +67,8 @@ func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 			},
 		},
 		{
-			Name:  "schedule_list",
-			Label: "Listing schedule",
+			Name:        "schedule_list",
+			Label:       "Listing schedule",
 			Description: "List all scheduled recurring tasks with their cron expressions, commands, next run times, and execution state (last status, errors, duration).",
 			Parameters:  map[string]any{},
 			Handler: func(_ context.Context, _ map[string]any) types.Result {
@@ -86,8 +87,8 @@ func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 			},
 		},
 		{
-			Name:  "schedule_remove",
-			Label: "Removing schedule",
+			Name:        "schedule_remove",
+			Label:       "Removing schedule",
 			Description: "Remove a scheduled recurring task by its ID.",
 			Parameters: map[string]any{
 				"id": map[string]any{
@@ -111,8 +112,8 @@ func ScheduleTools(sched *scheduler.Scheduler) []types.Tool {
 			},
 		},
 		{
-			Name:  "schedule_pause",
-			Label: "Pausing schedule",
+			Name:        "schedule_pause",
+			Label:       "Pausing schedule",
 			Description: "Pause or resume a scheduled recurring task. A paused task keeps its configuration and history but stops firing until resumed. Persists across restarts.",
 			Parameters: map[string]any{
 				"id": map[string]any{

@@ -3,13 +3,14 @@ package web
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/utils"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"io"
 	"net/http"
 	neturl "net/url"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/utils"
 
 	"github.com/PuerkitoBio/goquery"
 )

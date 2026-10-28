@@ -3,16 +3,17 @@ package core
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	"github.com/aspasskiy/gogogot/internal/channel"
 	"github.com/aspasskiy/gogogot/internal/core/agent"
 	"github.com/aspasskiy/gogogot/internal/core/chat"
 	"github.com/aspasskiy/gogogot/internal/core/prompt"
-	"github.com/aspasskiy/gogogot/internal/transport"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/scheduler"
-	types "github.com/aspasskiy/gogogot/internal/domain"
-	"github.com/aspasskiy/gogogot/internal/tools"
 	"github.com/aspasskiy/gogogot/internal/store"
-	"sync"
+	"github.com/aspasskiy/gogogot/internal/tools"
+	"github.com/aspasskiy/gogogot/internal/transport"
 
 	"github.com/rs/zerolog/log"
 )
@@ -241,7 +242,7 @@ func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, 
 	}
 
 	promptText := prompt.ScheduledTaskPrompt(taskID, command, skill)
-	blocks := []types.ContentBlock{types.TextBlock(promptText)}
+	blocks := []domain.ContentBlock{domain.TextBlock(promptText)}
 
 	input := agent.RunInput{
 		Messages:   ch.Messages(),

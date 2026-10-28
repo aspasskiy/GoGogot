@@ -3,9 +3,10 @@ package identity
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/aspasskiy/gogogot/internal/store"
 	"github.com/aspasskiy/gogogot/internal/tools/types"
-	"time"
 
 	"github.com/rs/zerolog/log"
 )
@@ -13,8 +14,8 @@ import (
 func IdentityTools(st store.Store, onTimezoneChange func(*time.Location)) []types.Tool {
 	return []types.Tool{
 		{
-			Name:  "soul_read",
-			Label: "Reading identity",
+			Name:        "soul_read",
+			Label:       "Reading identity",
 			Description: "Read your soul.md — your personality, values, and behavioral rules. This file defines who you are across all conversations.",
 			Parameters:  map[string]any{},
 			Handler: func(_ context.Context, _ map[string]any) types.Result {
@@ -26,8 +27,8 @@ func IdentityTools(st store.Store, onTimezoneChange func(*time.Location)) []type
 			},
 		},
 		{
-			Name:  "soul_write",
-			Label: "Updating identity",
+			Name:        "soul_write",
+			Label:       "Updating identity",
 			Description: "Write or update your soul.md — your identity file. Define your personality traits, communication style, core values, and behavioral rules. Read first with soul_read before updating to avoid losing information.",
 			Parameters: map[string]any{
 				"content": map[string]any{
@@ -48,8 +49,8 @@ func IdentityTools(st store.Store, onTimezoneChange func(*time.Location)) []type
 			},
 		},
 		{
-			Name:  "user_read",
-			Label: "Reading user profile",
+			Name:        "user_read",
+			Label:       "Reading user profile",
 			Description: "Read your user.md — everything you know about your owner. This file is loaded into your context automatically.",
 			Parameters:  map[string]any{},
 			Handler: func(_ context.Context, _ map[string]any) types.Result {
@@ -61,8 +62,8 @@ func IdentityTools(st store.Store, onTimezoneChange func(*time.Location)) []type
 			},
 		},
 		{
-			Name:  "user_write",
-			Label: "Updating user profile",
+			Name:        "user_write",
+			Label:       "Updating user profile",
 			Description: "Write or update your user.md — your owner's profile. Store their name, preferences, timezone, work context, communication style. Read first with user_read before updating to avoid losing information.",
 			Parameters: map[string]any{
 				"content": map[string]any{

@@ -3,10 +3,11 @@ package hook
 import (
 	"context"
 	"fmt"
-	domain "github.com/aspasskiy/gogogot/internal/domain"
-	"github.com/aspasskiy/gogogot/internal/llm"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/llm"
 
 	"github.com/rs/zerolog/log"
 )
@@ -26,13 +27,13 @@ func estimateBlocksChars(blocks []domain.ContentBlock) int {
 	var n int
 	for _, b := range blocks {
 		switch b.Type {
-		case "text":
+		case domain.BlockText:
 			n += len(b.Text)
-		case "tool_use":
+		case domain.BlockToolUse:
 			n += len(b.ToolName) + len(b.ToolInput)
-		case "tool_result":
+		case domain.BlockToolResult:
 			n += len(b.ToolOutput)
-		case "image":
+		case domain.BlockImage:
 			n += 1000
 		}
 	}
@@ -53,13 +54,13 @@ func contentToString(blocks []domain.ContentBlock) string {
 	var sb strings.Builder
 	for _, b := range blocks {
 		switch b.Type {
-		case "text":
+		case domain.BlockText:
 			sb.WriteString(b.Text)
-		case "tool_use":
+		case domain.BlockToolUse:
 			fmt.Fprintf(&sb, "[tool_use: %s]", b.ToolName)
-		case "tool_result":
+		case domain.BlockToolResult:
 			sb.WriteString(b.ToolOutput)
-		case "image":
+		case domain.BlockImage:
 			sb.WriteString("[image]")
 		}
 	}

@@ -25,8 +25,8 @@ var backoffSchedule = []time.Duration{
 }
 
 type Options struct {
-	TaskTimeout    time.Duration
-	MaxConcurrent  int
+	TaskTimeout   time.Duration
+	MaxConcurrent int
 }
 
 func (o Options) taskTimeout() time.Duration {

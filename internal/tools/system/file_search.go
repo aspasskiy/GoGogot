@@ -3,10 +3,11 @@ package system
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 )
 
 const (

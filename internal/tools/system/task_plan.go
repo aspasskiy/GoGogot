@@ -3,10 +3,11 @@ package system
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/transport"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"strings"
 	"sync"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 type taskStatus string

@@ -1,6 +1,10 @@
 package store
 
-import "time"
+import (
+	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
+)
 
 // Store defines the persistence contract for all application data.
 // Implementations may use a local filesystem, S3, or any other backend.
@@ -10,7 +14,7 @@ type Store interface {
 	// Chats
 	NewChat() *Chat
 	LoadChat(id string) (*Chat, error)
-	ListChats() ([]ChatInfo, error)
+	ListChats() ([]domain.ChatInfo, error)
 
 	// Active chat mapping
 	GetActiveChatID() (string, error)
@@ -31,7 +35,7 @@ type Store interface {
 
 	// Skills
 	SkillsDir() string
-	LoadSkills() ([]Skill, error)
+	LoadSkills() ([]domain.Skill, error)
 	CreateSkill(name, description, body string) (string, error)
 	UpdateSkill(name, content string) error
 	DeleteSkill(name string) error
@@ -43,8 +47,8 @@ type Store interface {
 type ChatPersister interface {
 	SaveChat(ch *Chat) error
 	LoadMessages(ch *Chat) error
-	AppendMessage(ch *Chat, msg Turn)
-	ReplaceMessages(ch *Chat, msgs []Turn) error
+	AppendMessage(ch *Chat, msg domain.Turn)
+	ReplaceMessages(ch *Chat, msgs []domain.Turn) error
 	TextMessages(ch *Chat) ([]Message, error)
 	HasMessages(ch *Chat) bool
 }

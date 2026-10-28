@@ -3,10 +3,11 @@ package system
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 )
 
 func pathDetail(input map[string]any) string {

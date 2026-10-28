@@ -2,13 +2,14 @@ package agent
 
 import (
 	"context"
+
 	"github.com/aspasskiy/gogogot/internal/core/agent/hook"
-	"github.com/aspasskiy/gogogot/internal/transport"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
-	llmTypes "github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/tools"
 	"github.com/aspasskiy/gogogot/internal/tools/system"
 	toolTypes "github.com/aspasskiy/gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 type Agent struct {
@@ -82,10 +83,10 @@ func (a *Agent) runAfterHooks(ctx context.Context, ic *hook.IterationContext, re
 	}
 }
 
-func (a *Agent) localToolDefs() []llmTypes.ToolDef {
-	defs := make([]llmTypes.ToolDef, 0, len(a.localTools))
+func (a *Agent) localToolDefs() []domain.ToolDef {
+	defs := make([]domain.ToolDef, 0, len(a.localTools))
 	for _, t := range a.localTools {
-		defs = append(defs, llmTypes.ToolDef{
+		defs = append(defs, domain.ToolDef{
 			Name:        t.Name,
 			Description: t.Description,
 			Parameters:  t.Parameters,

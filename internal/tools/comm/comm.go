@@ -2,15 +2,16 @@ package comm
 
 import (
 	"context"
-	"github.com/aspasskiy/gogogot/internal/transport"
+
 	"github.com/aspasskiy/gogogot/internal/tools/types"
+	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 func ChannelTools() []types.Tool {
 	return []types.Tool{
 		{
-			Name:  "send_file",
-			Label: "Sending file",
+			Name:        "send_file",
+			Label:       "Sending file",
 			Description: "Send a file (document, image, audio, video) back to the user through the current communication channel.",
 			Parameters: map[string]any{
 				"path": map[string]any{

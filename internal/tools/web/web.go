@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 
 	"github.com/rs/zerolog/log"
 )

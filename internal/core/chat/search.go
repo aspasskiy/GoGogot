@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
-	types "github.com/aspasskiy/gogogot/internal/domain"
-	"github.com/aspasskiy/gogogot/internal/store"
 )
 
 const maxSummariesForSearch = 50
@@ -21,13 +20,13 @@ If nothing is relevant, return: []
 No explanation, no extra text.`
 
 // SearchRelevant uses the LLM to find past chats semantically related to the query.
-func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.ChatInfo, error) {
+func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]domain.ChatInfo, error) {
 	all, err := m.store.ListChats()
 	if err != nil {
 		return nil, err
 	}
 
-	var closed []store.ChatInfo
+	var closed []domain.ChatInfo
 	for _, ch := range all {
 		if ch.Status == "closed" && ch.Summary != "" {
 			closed = append(closed, ch)
@@ -56,8 +55,8 @@ func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.Cha
 
 	prompt := fmt.Sprintf("Past conversations:\n%s\n---\nQuery: %s", catalog.String(), query)
 
-	resp, err := m.llm.Call(ctx, []types.Message{
-		types.NewUserMessage(types.TextBlock(prompt)),
+	resp, err := m.llm.Call(ctx, []domain.Message{
+		domain.NewUserMessage(domain.TextBlock(prompt)),
 	}, llm.CallOptions{
 		System:  searchSystem,
 		NoTools: true,
@@ -66,9 +65,9 @@ func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.Cha
 		return nil, fmt.Errorf("search LLM call: %w", err)
 	}
 
-	indices := parseSearchResponse(types.ExtractText(resp.Content))
+	indices := parseSearchResponse(domain.ExtractText(resp.Content))
 
-	var matches []store.ChatInfo
+	var matches []domain.ChatInfo
 	for _, idx := range indices {
 		if idx >= 1 && idx <= len(closed) {
 			matches = append(matches, closed[idx-1])
@@ -84,7 +83,7 @@ func (m *Manager) SearchRelevant(ctx context.Context, query string) ([]store.Cha
 }
 
 // SearchChats performs a simple word-based search over closed chats.
-func (m *Manager) SearchChats(query string) ([]store.ChatInfo, error) {
+func (m *Manager) SearchChats(query string) ([]domain.ChatInfo, error) {
 	all, err := m.store.ListChats()
 	if err != nil {
 		return nil, err
@@ -96,7 +95,7 @@ func (m *Manager) SearchChats(query string) ([]store.ChatInfo, error) {
 		return nil, nil
 	}
 
-	var matches []store.ChatInfo
+	var matches []domain.ChatInfo
 	for _, ch := range all {
 		if ch.Status != "closed" || ch.Summary == "" {
 			continue

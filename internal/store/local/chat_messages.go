@@ -3,23 +3,24 @@ package local
 import (
 	"bufio"
 	"encoding/json"
-	types "github.com/aspasskiy/gogogot/internal/domain"
-	"github.com/aspasskiy/gogogot/internal/store"
 	"os"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/store"
 
 	"github.com/rs/zerolog/log"
 )
 
 type jsonMessage struct {
-	Role      string               `json:"role"`
-	Content   []types.ContentBlock `json:"content"`
-	Timestamp time.Time            `json:"ts"`
-	Compacted bool                 `json:"compacted,omitempty"`
+	Role      string                `json:"role"`
+	Content   []domain.ContentBlock `json:"content"`
+	Timestamp time.Time             `json:"ts"`
+	Compacted bool                  `json:"compacted,omitempty"`
 }
 
 func (s *LocalStore) LoadMessages(ch *store.Chat) error {
-	msgs := make([]store.Turn, 0)
+	msgs := make([]domain.Turn, 0)
 	f, err := os.Open(s.messagesPath(ch))
 	if os.IsNotExist(err) {
 		ch.SetMessages(msgs)
@@ -42,7 +43,7 @@ func (s *LocalStore) LoadMessages(ch *store.Chat) error {
 			log.Warn().Err(err).Msg("chat: skipping corrupt JSONL line")
 			continue
 		}
-		msg := store.Turn{
+		msg := domain.Turn{
 			Role:      jm.Role,
 			Content:   jm.Content,
 			Timestamp: jm.Timestamp,
@@ -56,7 +57,7 @@ func (s *LocalStore) LoadMessages(ch *store.Chat) error {
 	return scanner.Err()
 }
 
-func (s *LocalStore) AppendMessage(ch *store.Chat, msg store.Turn) {
+func (s *LocalStore) AppendMessage(ch *store.Chat, msg domain.Turn) {
 	path := s.messagesPath(ch)
 	if path == "" {
 		return
@@ -76,7 +77,7 @@ func (s *LocalStore) AppendMessage(ch *store.Chat, msg store.Turn) {
 	f.Write(line)
 }
 
-func (s *LocalStore) ReplaceMessages(ch *store.Chat, msgs []store.Turn) error {
+func (s *LocalStore) ReplaceMessages(ch *store.Chat, msgs []domain.Turn) error {
 	path := s.messagesPath(ch)
 	if path == "" {
 		return nil
@@ -116,13 +117,13 @@ func (s *LocalStore) TextMessages(ch *store.Chat) ([]store.Message, error) {
 			continue
 		}
 		var jm struct {
-			Role    string               `json:"role"`
-			Content []types.ContentBlock `json:"content"`
+			Role    string                `json:"role"`
+			Content []domain.ContentBlock `json:"content"`
 		}
 		if json.Unmarshal(line, &jm) != nil {
 			continue
 		}
-		text := types.ExtractText(jm.Content)
+		text := domain.ExtractText(jm.Content)
 		if text == "" {
 			continue
 		}
@@ -136,7 +137,7 @@ func (s *LocalStore) HasMessages(ch *store.Chat) bool {
 	return err == nil && info.Size() > 0
 }
 
-func turnToJSON(msg store.Turn) jsonMessage {
+func turnToJSON(msg domain.Turn) jsonMessage {
 	jm := jsonMessage{
 		Role:      msg.Role,
 		Content:   msg.Content,

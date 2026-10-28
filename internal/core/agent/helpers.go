@@ -2,39 +2,40 @@ package agent
 
 import (
 	"encoding/json"
-	types "github.com/aspasskiy/gogogot/internal/domain"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 
 	"github.com/rs/zerolog/log"
 )
 
 type parsedResponse struct {
-	assistantBlocks []types.ContentBlock
-	toolCalls       []types.ContentBlock
+	assistantBlocks []domain.ContentBlock
+	toolCalls       []domain.ContentBlock
 	textContent     string
 }
 
 // buildLLMMessages projects the agent's working set of turns into the message
 // form the LLM client expects.
-func buildLLMMessages(turns []types.Turn) []types.Message {
-	msgs := make([]types.Message, 0, len(turns))
+func buildLLMMessages(turns []domain.Turn) []domain.Message {
+	msgs := make([]domain.Message, 0, len(turns))
 	for _, t := range turns {
-		role := types.RoleUser
-		if t.Role == string(types.RoleAssistant) {
-			role = types.RoleAssistant
+		role := domain.RoleUser
+		if t.Role == string(domain.RoleAssistant) {
+			role = domain.RoleAssistant
 		}
-		msgs = append(msgs, types.Message{Role: role, Content: t.Content})
+		msgs = append(msgs, domain.Message{Role: role, Content: t.Content})
 	}
 	return msgs
 }
 
-func parseResponseBlocks(content []types.ContentBlock) parsedResponse {
+func parseResponseBlocks(content []domain.ContentBlock) parsedResponse {
 	var p parsedResponse
 	for _, block := range content {
 		switch block.Type {
-		case "tool_use":
+		case domain.BlockToolUse:
 			p.toolCalls = append(p.toolCalls, block)
 			p.assistantBlocks = append(p.assistantBlocks, block)
-		case "text":
+		case domain.BlockText:
 			p.textContent += block.Text
 			p.assistantBlocks = append(p.assistantBlocks, block)
 		}

@@ -2,27 +2,21 @@ package llm
 
 import (
 	"context"
+	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 	anthpkg "github.com/aspasskiy/gogogot/internal/llm/anthropic"
 	oaipkg "github.com/aspasskiy/gogogot/internal/llm/openai"
-	types "github.com/aspasskiy/gogogot/internal/domain"
-	"time"
-)
-
-type (
-	Message      = types.Message
-	Response     = types.Response
-	ToolDef      = types.ToolDef
-	ContentBlock = types.ContentBlock
 )
 
 type Adapter interface {
 	Call(ctx context.Context, model string, systemPrompt string,
-		messages []types.Message, tools []types.ToolDef, maxTokens int,
-	) (*types.Response, error)
+		messages []domain.Message, tools []domain.ToolDef, maxTokens int,
+	) (*domain.Response, error)
 }
 
 type LLM interface {
-	Call(ctx context.Context, messages []Message, opts CallOptions) (*Response, error)
+	Call(ctx context.Context, messages []domain.Message, opts CallOptions) (*domain.Response, error)
 	ModelID() string
 	ModelLabel() string
 	ContextWindow() int
@@ -35,19 +29,19 @@ type CallOptions struct {
 	SystemAppend string
 	Memory       string
 	NoTools      bool
-	ExtraTools   []ToolDef
+	ExtraTools   []domain.ToolDef
 	MaxTokens    int
 }
 
 type Client struct {
 	adapter  Adapter
 	model    string
-	tools    []ToolDef
+	tools    []domain.ToolDef
 	provider Provider
 	timeout  time.Duration
 }
 
-func NewClient(p Provider, toolDefs []ToolDef) *Client {
+func NewClient(p Provider, toolDefs []domain.ToolDef) *Client {
 	var adapter Adapter
 	switch p.Format {
 	case "openai":
@@ -73,7 +67,7 @@ func (c *Client) callCtx(parent context.Context) (context.Context, context.Cance
 	return parent, func() {}
 }
 
-func (c *Client) SetTools(defs []ToolDef) {
+func (c *Client) SetTools(defs []domain.ToolDef) {
 	c.tools = defs
 }
 
@@ -97,7 +91,7 @@ func (c *Client) OutputPricePerM() float64 {
 	return c.provider.OutputPricePerM
 }
 
-func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions) (*Response, error) {
+func (c *Client) Call(ctx context.Context, messages []domain.Message, opts CallOptions) (*domain.Response, error) {
 	sys := opts.System
 	if opts.SystemAppend != "" {
 		sys += "\n\n" + opts.SystemAppend
@@ -106,11 +100,11 @@ func (c *Client) Call(ctx context.Context, messages []Message, opts CallOptions)
 		sys += "\n\n## Current Memory\n" + opts.Memory
 	}
 
-	var tools []ToolDef
+	var tools []domain.ToolDef
 	if !opts.NoTools {
 		tools = c.tools
 		if len(opts.ExtraTools) > 0 {
-			tools = append(append([]ToolDef{}, c.tools...), opts.ExtraTools...)
+			tools = append(append([]domain.ToolDef{}, c.tools...), opts.ExtraTools...)
 		}
 	}
 

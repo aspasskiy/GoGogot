@@ -3,11 +3,12 @@ package web
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"io"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 )
 
 const (
@@ -17,8 +18,8 @@ const (
 
 func WebRequestTool() types.Tool {
 	return types.Tool{
-		Name:  "web_request",
-		Label: "Making request",
+		Name:        "web_request",
+		Label:       "Making request",
 		Description: "Make an HTTP request with any method (GET, POST, PUT, DELETE, PATCH) and custom headers. Returns status code, selected response headers, and body. Use for calling REST APIs, webhooks, or any HTTP endpoint.",
 		Parameters: map[string]any{
 			"url": map[string]any{

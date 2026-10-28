@@ -16,10 +16,10 @@ import (
 	"github.com/aspasskiy/gogogot/internal/core/agent/hook"
 	"github.com/aspasskiy/gogogot/internal/core/chat"
 	"github.com/aspasskiy/gogogot/internal/core/prompt"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
 	"github.com/aspasskiy/gogogot/internal/logger"
 	"github.com/aspasskiy/gogogot/internal/scheduler"
-	"github.com/aspasskiy/gogogot/internal/store"
 	"github.com/aspasskiy/gogogot/internal/store/local"
 	"github.com/aspasskiy/gogogot/internal/tools"
 	"github.com/aspasskiy/gogogot/internal/tools/comm"
@@ -112,7 +112,7 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 			ModelLabel:    modelLabel,
 			Soul:          st.ReadSoul(),
 			User:          st.ReadUser(),
-			SkillsBlock:   store.FormatSkillsForPrompt(skills),
+			SkillsBlock:   domain.FormatSkillsForPrompt(skills),
 			Timezone:      st.LoadTimezone(),
 		})
 	}

@@ -1,24 +1,10 @@
 package store
 
 import (
-	domain "github.com/aspasskiy/gogogot/internal/domain"
 	"time"
-)
 
-// The cross-cutting value types live in the domain package. They are aliased
-// here so existing store.* references (store.Turn, store.Usage, …) keep working
-// while the canonical definitions stay in one place.
-type (
-	Turn           = domain.Turn
-	Usage          = domain.Usage
-	ChatInfo       = domain.ChatInfo
-	ChatSearchFunc = domain.ChatSearchFunc
-	Skill          = domain.Skill
+	"github.com/aspasskiy/gogogot/internal/domain"
 )
-
-// FormatSkillsForPrompt is re-exported from domain for callers that already
-// reference store.FormatSkillsForPrompt.
-var FormatSkillsForPrompt = domain.FormatSkillsForPrompt
 
 // --- Chat (active record: carries a back-reference to its persister) ---
 
@@ -34,8 +20,8 @@ type Chat struct {
 	UpdatedAt time.Time `json:"updated_at"`
 
 	persister  ChatPersister `json:"-"`
-	messages   []Turn        `json:"-"`
-	totalUsage Usage         `json:"-"`
+	messages   []domain.Turn `json:"-"`
+	totalUsage domain.Usage  `json:"-"`
 }
 
 func (c *Chat) SetPersister(p ChatPersister) { c.persister = p }
@@ -51,7 +37,7 @@ func (c *Chat) LoadMessages() error              { return c.persister.LoadMessag
 func (c *Chat) TextMessages() ([]Message, error) { return c.persister.TextMessages(c) }
 func (c *Chat) HasMessages() bool                { return c.persister.HasMessages(c) }
 
-func (c *Chat) AppendMessage(msg Turn) {
+func (c *Chat) AppendMessage(msg domain.Turn) {
 	if msg.Timestamp.IsZero() {
 		msg.Timestamp = time.Now()
 	}
@@ -65,14 +51,14 @@ func (c *Chat) AppendMessage(msg Turn) {
 	c.persister.AppendMessage(c, msg)
 }
 
-func (c *Chat) ReplaceMessages(msgs []Turn) error {
+func (c *Chat) ReplaceMessages(msgs []domain.Turn) error {
 	c.messages = msgs
 	return c.persister.ReplaceMessages(c, msgs)
 }
 
-func (c *Chat) Messages() []Turn        { return c.messages }
-func (c *Chat) TotalUsage() *Usage      { return &c.totalUsage }
-func (c *Chat) SetMessages(msgs []Turn) { c.messages = msgs }
+func (c *Chat) Messages() []domain.Turn        { return c.messages }
+func (c *Chat) TotalUsage() *domain.Usage      { return &c.totalUsage }
+func (c *Chat) SetMessages(msgs []domain.Turn) { c.messages = msgs }
 
 // --- Store-local projections (persistence concerns, not domain) ---
 

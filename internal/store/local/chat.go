@@ -3,12 +3,14 @@ package local
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/store"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/store"
 
 	"github.com/google/uuid"
 )
@@ -73,12 +75,12 @@ func (s *LocalStore) LoadChat(id string) (*store.Chat, error) {
 	return nil, fmt.Errorf("chat %q not found", id)
 }
 
-func (s *LocalStore) ListChats() ([]store.ChatInfo, error) {
+func (s *LocalStore) ListChats() ([]domain.ChatInfo, error) {
 	dateDirs, err := os.ReadDir(s.chatsDir())
 	if err != nil {
 		return nil, err
 	}
-	var out []store.ChatInfo
+	var out []domain.ChatInfo
 	for _, dd := range dateDirs {
 		if !dd.IsDir() {
 			continue
@@ -97,7 +99,7 @@ func (s *LocalStore) ListChats() ([]store.ChatInfo, error) {
 			}
 			var ch store.Chat
 			if json.Unmarshal(data, &ch) == nil {
-				out = append(out, store.ChatInfo{
+				out = append(out, domain.ChatInfo{
 					ID:        ch.ID,
 					Title:     ch.Title,
 					Summary:   ch.Summary,

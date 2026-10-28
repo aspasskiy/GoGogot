@@ -1,7 +1,7 @@
 package transport
 
 import (
-	domain "github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/domain"
 )
 
 // Event is a sealed interface implemented by every agent event. The unexported

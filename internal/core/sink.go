@@ -2,7 +2,8 @@ package core
 
 import (
 	"context"
-	domain "github.com/aspasskiy/gogogot/internal/domain"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
 	"github.com/aspasskiy/gogogot/internal/transport"
 

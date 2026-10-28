@@ -2,9 +2,10 @@ package hook
 
 import (
 	"context"
-	domain "github.com/aspasskiy/gogogot/internal/domain"
-	"github.com/aspasskiy/gogogot/internal/llm"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/llm"
 )
 
 // IterationContext is the per-iteration view passed to hooks. It holds the

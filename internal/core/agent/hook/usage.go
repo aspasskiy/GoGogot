@@ -2,7 +2,8 @@ package hook
 
 import (
 	"context"
-	domain "github.com/aspasskiy/gogogot/internal/domain"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 )
 
 // UsageAfterIteration computes this iteration's token/cost usage and stores it

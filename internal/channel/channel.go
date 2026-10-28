@@ -2,6 +2,7 @@ package channel
 
 import (
 	"context"
+
 	"github.com/aspasskiy/gogogot/internal/transport"
 )
 

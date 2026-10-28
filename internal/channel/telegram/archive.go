@@ -6,10 +6,11 @@ import (
 	"bytes"
 	"compress/gzip"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/transport"
 	"io"
 	"path/filepath"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 func isArchiveZip(mime, filename string) bool {

@@ -3,16 +3,17 @@ package recall
 import (
 	"context"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/store"
-	"github.com/aspasskiy/gogogot/internal/tools/types"
 	"strings"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/tools/types"
 )
 
 // RecallTool builds the recall tool that delegates search to the provided function.
-func RecallTool(searchFn store.ChatSearchFunc) types.Tool {
+func RecallTool(searchFn domain.ChatSearchFunc) types.Tool {
 	return types.Tool{
-		Name:  "recall",
-		Label: "Recalling history",
+		Name:        "recall",
+		Label:       "Recalling history",
 		Description: "Search your conversation history for past context. Use when the user references something from a previous conversation, or when you need to recall what was discussed before. Returns summaries of matching past conversations.",
 		Parameters: map[string]any{
 			"query": map[string]any{

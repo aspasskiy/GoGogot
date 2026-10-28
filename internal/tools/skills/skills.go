@@ -3,16 +3,17 @@ package skills
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/aspasskiy/gogogot/internal/store"
 	"github.com/aspasskiy/gogogot/internal/tools/types"
-	"strings"
 )
 
 func SkillTools(st store.Store) []types.Tool {
 	return []types.Tool{
 		{
-			Name:  "skill_list",
-			Label: "Listing skills",
+			Name:        "skill_list",
+			Label:       "Listing skills",
 			Description: "List all available skills with their name and description. Skills are reusable procedural knowledge — workflows, integrations, how-to guides — that you created from past experience.",
 			Parameters:  map[string]any{},
 			Handler: func(_ context.Context, _ map[string]any) types.Result {
@@ -129,8 +130,8 @@ func SkillTools(st store.Store) []types.Tool {
 			},
 		},
 		{
-			Name:  "skill_delete",
-			Label: "Deleting skill",
+			Name:        "skill_delete",
+			Label:       "Deleting skill",
 			Description: "Delete a skill and its entire directory. Use when a skill is obsolete or incorrect.",
 			Parameters: map[string]any{
 				"name": map[string]any{

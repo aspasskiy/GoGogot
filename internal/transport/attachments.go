@@ -3,29 +3,30 @@ package transport
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/aspasskiy/gogogot/internal/utils"
-	types "github.com/aspasskiy/gogogot/internal/domain"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/utils"
+
 	"github.com/rs/zerolog/log"
 )
 
-func ProcessAttachments(chatID, task string, attachments []Attachment) ([]types.ContentBlock, func()) {
+func ProcessAttachments(chatID, task string, attachments []Attachment) ([]domain.ContentBlock, func()) {
 	if len(attachments) == 0 {
-		return []types.ContentBlock{types.TextBlock(task)}, func() {}
+		return []domain.ContentBlock{domain.TextBlock(task)}, func() {}
 	}
 
 	tmpDir := filepath.Join(os.TempDir(), "gogogot-uploads",
 		fmt.Sprintf("%s-%d", chatID, time.Now().UnixNano()))
 	if err := os.MkdirAll(tmpDir, 0755); err != nil {
 		log.Error().Err(err).Msg("failed to create upload dir")
-		return []types.ContentBlock{types.TextBlock(task)}, func() {}
+		return []domain.ContentBlock{domain.TextBlock(task)}, func() {}
 	}
 
-	var imageBlocks []types.ContentBlock
+	var imageBlocks []domain.ContentBlock
 	var paths []string
 	nameCount := map[string]int{}
 
@@ -40,7 +41,7 @@ func ProcessAttachments(chatID, task string, attachments []Attachment) ([]types.
 
 		if strings.HasPrefix(att.MimeType, "image/") {
 			b64 := base64.StdEncoding.EncodeToString(att.Data)
-			imageBlocks = append(imageBlocks, types.ImageBlock(att.MimeType, b64))
+			imageBlocks = append(imageBlocks, domain.ImageBlock(att.MimeType, b64))
 		}
 	}
 
@@ -53,8 +54,8 @@ func ProcessAttachments(chatID, task string, attachments []Attachment) ([]types.
 		text = info
 	}
 
-	blocks := make([]types.ContentBlock, 0, 1+len(imageBlocks))
-	blocks = append(blocks, types.TextBlock(text))
+	blocks := make([]domain.ContentBlock, 0, 1+len(imageBlocks))
+	blocks = append(blocks, domain.TextBlock(text))
 	blocks = append(blocks, imageBlocks...)
 
 	cleanup := func() { os.RemoveAll(tmpDir) }

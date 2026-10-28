@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	types "github.com/aspasskiy/gogogot/internal/domain"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
 )
 
@@ -46,10 +46,10 @@ func TestAppendMessage_ConcurrentNoLoss(t *testing.T) {
 		go func(i int) {
 			defer wg.Done()
 			<-start
-			msg := store.Turn{
+			msg := domain.Turn{
 				Role: "user",
-				Content: []types.ContentBlock{
-					types.TextBlock(fmt.Sprintf("msg-%d-with-padding-to-widen-the-race-window", i)),
+				Content: []domain.ContentBlock{
+					domain.TextBlock(fmt.Sprintf("msg-%d-with-padding-to-widen-the-race-window", i)),
 				},
 				Timestamp: time.Now(),
 			}
@@ -73,9 +73,9 @@ func TestAppendMessage_SequentialRoundTrip(t *testing.T) {
 	s, ch := newConcurrentChatTestStore(t)
 
 	for i := 0; i < 5; i++ {
-		s.AppendMessage(ch, store.Turn{
+		s.AppendMessage(ch, domain.Turn{
 			Role:      "user",
-			Content:   []types.ContentBlock{types.TextBlock(fmt.Sprintf("seq-%d", i))},
+			Content:   []domain.ContentBlock{domain.TextBlock(fmt.Sprintf("seq-%d", i))},
 			Timestamp: time.Now(),
 		})
 	}

@@ -4,9 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	types "github.com/aspasskiy/gogogot/internal/domain"
 	"net/http"
 	"time"
+
+	"github.com/aspasskiy/gogogot/internal/domain"
 
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
@@ -35,10 +36,10 @@ func (a *Adapter) Call(
 	ctx context.Context,
 	model string,
 	systemPrompt string,
-	messages []types.Message,
-	tools []types.ToolDef,
+	messages []domain.Message,
+	tools []domain.ToolDef,
 	maxTokens int,
-) (*types.Response, error) {
+) (*domain.Response, error) {
 	anthMsgs := messagesToAnthropic(messages)
 	anthTools := toolDefsToAnthropic(tools)
 
@@ -61,19 +62,19 @@ func (a *Adapter) Call(
 	return anthropicToResponse(msg), nil
 }
 
-func messagesToAnthropic(msgs []types.Message) []anthropic.MessageParam {
+func messagesToAnthropic(msgs []domain.Message) []anthropic.MessageParam {
 	out := make([]anthropic.MessageParam, 0, len(msgs))
 	for _, m := range msgs {
 		var blocks []anthropic.ContentBlockParamUnion
 		for _, b := range m.Content {
 			switch b.Type {
-			case "text":
+			case domain.BlockText:
 				blocks = append(blocks, anthropic.NewTextBlock(b.Text))
-			case "image":
+			case domain.BlockImage:
 				blocks = append(blocks, anthropic.NewImageBlockBase64(b.MimeType, b.ImageData))
-			case "tool_use":
+			case domain.BlockToolUse:
 				blocks = append(blocks, anthropic.NewToolUseBlock(b.ToolUseID, b.ToolInput, b.ToolName))
-			case "tool_result":
+			case domain.BlockToolResult:
 				blocks = append(blocks, anthropic.ContentBlockParamUnion{
 					OfToolResult: &anthropic.ToolResultBlockParam{
 						ToolUseID: b.ToolUseID,
@@ -87,7 +88,7 @@ func messagesToAnthropic(msgs []types.Message) []anthropic.MessageParam {
 		}
 
 		role := anthropic.MessageParamRoleUser
-		if m.Role == types.RoleAssistant {
+		if m.Role == domain.RoleAssistant {
 			role = anthropic.MessageParamRoleAssistant
 		}
 		out = append(out, anthropic.MessageParam{Role: role, Content: blocks})
@@ -95,7 +96,7 @@ func messagesToAnthropic(msgs []types.Message) []anthropic.MessageParam {
 	return out
 }
 
-func toolDefsToAnthropic(defs []types.ToolDef) []anthropic.ToolUnionParam {
+func toolDefsToAnthropic(defs []domain.ToolDef) []anthropic.ToolUnionParam {
 	out := make([]anthropic.ToolUnionParam, 0, len(defs))
 	for _, d := range defs {
 		out = append(out, anthropic.ToolUnionParam{
@@ -112,8 +113,8 @@ func toolDefsToAnthropic(defs []types.ToolDef) []anthropic.ToolUnionParam {
 	return out
 }
 
-func anthropicToResponse(msg *anthropic.Message) *types.Response {
-	resp := &types.Response{
+func anthropicToResponse(msg *anthropic.Message) *domain.Response {
+	resp := &domain.Response{
 		ID:           msg.ID,
 		StopReason:   string(msg.StopReason),
 		InputTokens:  int(msg.Usage.InputTokens),
@@ -122,11 +123,11 @@ func anthropicToResponse(msg *anthropic.Message) *types.Response {
 	for _, block := range msg.Content {
 		switch block.Type {
 		case "text":
-			resp.Content = append(resp.Content, types.TextBlock(block.AsText().Text))
+			resp.Content = append(resp.Content, domain.TextBlock(block.AsText().Text))
 		case "tool_use":
 			tu := block.AsToolUse()
 			raw, _ := json.Marshal(tu.Input)
-			resp.Content = append(resp.Content, types.ToolUseBlock(tu.ID, tu.Name, raw))
+			resp.Content = append(resp.Content, domain.ToolUseBlock(tu.ID, tu.Name, raw))
 		}
 	}
 	return resp

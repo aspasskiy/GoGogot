@@ -3,11 +3,13 @@ package telegram
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	"github.com/aspasskiy/gogogot/internal/channel"
 	"github.com/aspasskiy/gogogot/internal/channel/telegram/client"
-	"github.com/aspasskiy/gogogot/internal/transport"
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
-	"strings"
+	"github.com/aspasskiy/gogogot/internal/transport"
 )
 
 var commandMap = map[string]string{
@@ -80,7 +82,7 @@ func (c *Channel) handleCommand(ctx context.Context, chatID int64, reply transpo
 
 func formatPayload(payload any) string {
 	switch v := payload.(type) {
-	case []store.ChatInfo:
+	case []domain.ChatInfo:
 		return FormatHistory(v)
 	case []store.MemoryFile:
 		return FormatMemory(v)
@@ -89,8 +91,8 @@ func formatPayload(payload any) string {
 	}
 }
 
-func FormatHistory(chats []store.ChatInfo) string {
-	var closed []store.ChatInfo
+func FormatHistory(chats []domain.ChatInfo) string {
+	var closed []domain.ChatInfo
 	for _, ch := range chats {
 		if ch.Status == "closed" {
 			closed = append(closed, ch)
@@ -149,4 +151,3 @@ func FormatMemory(files []store.MemoryFile) string {
 	}
 	return sb.String()
 }
-

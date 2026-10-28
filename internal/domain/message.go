@@ -14,8 +14,19 @@ type Message struct {
 	Content []ContentBlock
 }
 
+// BlockType identifies the kind of a ContentBlock. It is a plain string type so
+// the persisted JSON format stays unchanged.
+type BlockType = string
+
+const (
+	BlockText       BlockType = "text"
+	BlockImage      BlockType = "image"
+	BlockToolUse    BlockType = "tool_use"
+	BlockToolResult BlockType = "tool_result"
+)
+
 type ContentBlock struct {
-	Type       string          `json:"type"` // "text", "image", "tool_use", "tool_result"
+	Type       BlockType       `json:"type"`
 	Text       string          `json:"text,omitempty"`
 	ToolUseID  string          `json:"tool_use_id,omitempty"`
 	ToolName   string          `json:"tool_name,omitempty"`
@@ -42,25 +53,25 @@ type Response struct {
 }
 
 func TextBlock(text string) ContentBlock {
-	return ContentBlock{Type: "text", Text: text}
+	return ContentBlock{Type: BlockText, Text: text}
 }
 
 func ImageBlock(mimeType, base64Data string) ContentBlock {
-	return ContentBlock{Type: "image", MimeType: mimeType, ImageData: base64Data}
+	return ContentBlock{Type: BlockImage, MimeType: mimeType, ImageData: base64Data}
 }
 
 func ToolUseBlock(id, name string, input json.RawMessage) ContentBlock {
-	return ContentBlock{Type: "tool_use", ToolUseID: id, ToolName: name, ToolInput: input}
+	return ContentBlock{Type: BlockToolUse, ToolUseID: id, ToolName: name, ToolInput: input}
 }
 
 func ToolResultBlock(id, output string, isErr bool) ContentBlock {
-	return ContentBlock{Type: "tool_result", ToolUseID: id, ToolOutput: output, ToolIsErr: isErr}
+	return ContentBlock{Type: BlockToolResult, ToolUseID: id, ToolOutput: output, ToolIsErr: isErr}
 }
 
 func ExtractText(blocks []ContentBlock) string {
 	var s string
 	for _, b := range blocks {
-		if b.Type == "text" {
+		if b.Type == BlockText {
 			s += b.Text
 		}
 	}
