@@ -38,6 +38,9 @@ func parseResponseBlocks(content []domain.ContentBlock) parsedResponse {
 		case domain.BlockText:
 			p.textContent += block.Text
 			p.assistantBlocks = append(p.assistantBlocks, block)
+		case domain.BlockThinking, domain.BlockRedactedThinking:
+			// Kept in order: the adapter replays them on the next iteration.
+			p.assistantBlocks = append(p.assistantBlocks, block)
 		}
 	}
 	return p

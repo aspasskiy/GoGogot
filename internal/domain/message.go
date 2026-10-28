@@ -23,11 +23,17 @@ const (
 	BlockImage      BlockType = "image"
 	BlockToolUse    BlockType = "tool_use"
 	BlockToolResult BlockType = "tool_result"
+
+	// Model reasoning (Anthropic). Must be sent back unchanged in later
+	// requests of the same run, so Text and Signature are stored verbatim.
+	BlockThinking         BlockType = "thinking"
+	BlockRedactedThinking BlockType = "redacted_thinking"
 )
 
 type ContentBlock struct {
 	Type       BlockType       `json:"type"`
 	Text       string          `json:"text,omitempty"`
+	Signature  string          `json:"signature,omitempty"` // thinking: signature; redacted_thinking: encrypted data
 	ToolUseID  string          `json:"tool_use_id,omitempty"`
 	ToolName   string          `json:"tool_name,omitempty"`
 	ToolInput  json.RawMessage `json:"tool_input,omitempty"`
@@ -92,6 +98,18 @@ func ImageBlock(mimeType, base64Data string) ContentBlock {
 
 func ToolUseBlock(id, name string, input json.RawMessage) ContentBlock {
 	return ContentBlock{Type: BlockToolUse, ToolUseID: id, ToolName: name, ToolInput: input}
+}
+
+func ThinkingBlock(thinking, signature string) ContentBlock {
+	return ContentBlock{Type: BlockThinking, Text: thinking, Signature: signature}
+}
+
+func RedactedThinkingBlock(data string) ContentBlock {
+	return ContentBlock{Type: BlockRedactedThinking, Signature: data}
+}
+
+func IsThinking(b ContentBlock) bool {
+	return b.Type == BlockThinking || b.Type == BlockRedactedThinking
 }
 
 func ToolResultBlock(id, output string, isErr bool) ContentBlock {

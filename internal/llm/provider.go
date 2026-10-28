@@ -35,7 +35,7 @@ type Provider struct {
 }
 
 var aliases = map[string]string{
-	"claude":   "claude-sonnet-4-6",
+	"claude":   "claude-sonnet-5-5",
 	"deepseek": "deepseek/deepseek-v4-flash",
 	"gemini":   "google/gemini-3-flash-preview",
 	"grok":     "x-ai/grok-build-0.1",

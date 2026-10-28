@@ -33,7 +33,7 @@ docker run -d --restart unless-stopped \
   -e TELEGRAM_OWNER_ID=... \
   -e GOGOGOT_PROVIDER=anthropic \
   -e ANTHROPIC_API_KEY=... \
-  -e GOGOGOT_MODEL=claude-sonnet-4-6 \
+  -e GOGOGOT_MODEL=claude-sonnet-5-5 \
   -v ./data:/data \
   -v ./work:/work \
   octagonlab/gogogot:latest
@@ -53,7 +53,7 @@ TELEGRAM_BOT_TOKEN=...
 TELEGRAM_OWNER_ID=...
 GOGOGOT_PROVIDER=anthropic
 ANTHROPIC_API_KEY=...
-GOGOGOT_MODEL=claude-sonnet-4-6
+GOGOGOT_MODEL=claude-sonnet-5-5
 EOF
 
 docker compose up -d
@@ -79,7 +79,7 @@ Set `GOGOGOT_PROVIDER`, `GOGOGOT_MODEL`, and the corresponding API key. The agen
 
 | Provider | `GOGOGOT_PROVIDER` | API key env | Example `GOGOGOT_MODEL` |
 |---|---|---|---|
-| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5` |
+| Anthropic | `anthropic` | `ANTHROPIC_API_KEY` | `claude-sonnet-5-5`, `claude-opus-5-5`, `claude-fable-5-1`, `claude-haiku-5-5` |
 | OpenAI | `openai` | `OPENAI_API_KEY` | `gpt-5.6-sol`, `gpt-5.6-terra`, `gpt-5.6-luna`, `gpt-5.5`, `gpt-5.4-mini` |
 | OpenRouter | `openrouter` | `OPENROUTER_API_KEY` | `qwen/qwen3.7-max`, `deepseek/deepseek-v4-flash`, `x-ai/grok-build-0.1` |
 
@@ -97,8 +97,8 @@ For convenience, short aliases are supported as `GOGOGOT_MODEL` values:
 | `grok` | `x-ai/grok-build-0.1` | 88.9% |
 | `deepseek` | `deepseek/deepseek-v4-flash` | 81.7% |
 | `gemini` | `google/gemini-3-flash-preview` | 72.1% |
-| `claude` | `claude-sonnet-4-6` | 62.7% |
 | `kimi` | `moonshotai/kimi-k2.5` | 54.6% |
+| `claude` | `claude-sonnet-5-5` | — |
 | `openai` | `openai/gpt-5-nano` | — |
 | `llama` | `meta-llama/llama-4-maverick` | — |
 | `minimax` | `minimax/minimax-m2.5` | — |

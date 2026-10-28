@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aspasskiy/gogogot/internal/domain"
@@ -42,6 +43,12 @@ func (a *Adapter) Call(
 	anthMsgs := messagesToAnthropic(messages)
 	anthTools := toolDefsToAnthropic(tools)
 
+	// Thinking shares max_tokens with the answer; callers size the limit for
+	// the visible answer only, so a small limit would be spent on reasoning.
+	if bindsThinking(model) && maxTokens < thinkingMaxTokens {
+		maxTokens = thinkingMaxTokens
+	}
+
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(model),
 		MaxTokens: int64(maxTokens),
@@ -57,13 +64,43 @@ func (a *Adapter) Call(
 		addCacheBreakpoints(&params)
 	}
 
+	var reqOpts []option.RequestOption
+	if bindsThinking(model) {
+		// Thinking is always on for these models and its blocks are bound to
+		// the conversation prefix. If history was rewritten (compaction), drop
+		// the stale blocks instead of failing the request with a 400.
+		params.Thinking = anthropic.ThinkingConfigParamUnion{OfAdaptive: &anthropic.ThinkingConfigAdaptiveParam{}}
+		reqOpts = append(reqOpts,
+			option.WithHeaderAdd("anthropic-beta", thinkingBindingBeta),
+			option.WithJSONSet("thinking.block_binding.prefix_mismatch_behavior", "drop_block"),
+		)
+	}
+
 	start := time.Now()
-	msg, err := a.client.Messages.New(ctx, params)
+	msg, err := a.client.Messages.New(ctx, params, reqOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("anthropic call (%s, elapsed %s): %w", model, time.Since(start), err)
 	}
 
 	return anthropicToResponse(msg), nil
+}
+
+const (
+	thinkingBindingBeta = "thinking-binding-controls-2026-08-01"
+	// Floor for max_tokens on always-thinking models. Stays under the SDK's
+	// ~21K non-streaming limit.
+	thinkingMaxTokens = 16000
+)
+
+// bindsThinking reports whether the model runs thinking by default and binds
+// thinking blocks to the conversation (Claude 5 family).
+func bindsThinking(model string) bool {
+	for _, prefix := range []string{"claude-fable-5", "claude-mythos-5", "claude-opus-5", "claude-sonnet-5", "claude-haiku-5"} {
+		if strings.HasPrefix(model, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 // addCacheBreakpoints marks the request prefix for prompt caching: the tool
@@ -90,11 +127,25 @@ func addCacheBreakpoints(params *anthropic.MessageNewParams) {
 }
 
 func messagesToAnthropic(msgs []domain.Message) []anthropic.MessageParam {
+	runStart := currentRunStart(msgs)
 	out := make([]anthropic.MessageParam, 0, len(msgs))
-	for _, m := range msgs {
+	for i, m := range msgs {
 		var blocks []anthropic.ContentBlockParamUnion
 		for _, b := range m.Content {
 			switch b.Type {
+			case domain.BlockThinking, domain.BlockRedactedThinking:
+				// Earlier runs were produced under a different system prompt
+				// (it carries the current time), so their thinking no longer
+				// matches the prefix. Dropping blocks from the front of the
+				// history is allowed; the current run's blocks go back as-is.
+				if i < runStart {
+					continue
+				}
+				if b.Type == domain.BlockThinking {
+					blocks = append(blocks, anthropic.NewThinkingBlock(b.Signature, b.Text))
+				} else {
+					blocks = append(blocks, anthropic.NewRedactedThinkingBlock(b.Signature))
+				}
 			case domain.BlockText:
 				blocks = append(blocks, anthropic.NewTextBlock(b.Text))
 			case domain.BlockImage:
@@ -114,6 +165,9 @@ func messagesToAnthropic(msgs []domain.Message) []anthropic.MessageParam {
 			}
 		}
 
+		if len(blocks) == 0 {
+			continue // e.g. a thinking-only turn from an earlier run
+		}
 		role := anthropic.MessageParamRoleUser
 		if m.Role == domain.RoleAssistant {
 			role = anthropic.MessageParamRoleAssistant
@@ -121,6 +175,17 @@ func messagesToAnthropic(msgs []domain.Message) []anthropic.MessageParam {
 		out = append(out, anthropic.MessageParam{Role: role, Content: blocks})
 	}
 	return out
+}
+
+// currentRunStart returns the index of the last message the user typed (a
+// user turn that is not just tool results) — where the current agent run began.
+func currentRunStart(msgs []domain.Message) int {
+	for i := len(msgs) - 1; i >= 0; i-- {
+		if msgs[i].Role == domain.RoleUser && !domain.IsToolResultTurn(msgs[i].Content) {
+			return i
+		}
+	}
+	return 0
 }
 
 func toolDefsToAnthropic(defs []domain.ToolDef) []anthropic.ToolUnionParam {
@@ -158,6 +223,11 @@ func anthropicToResponse(msg *anthropic.Message) *domain.Response {
 			tu := block.AsToolUse()
 			raw, _ := json.Marshal(tu.Input)
 			resp.Content = append(resp.Content, domain.ToolUseBlock(tu.ID, tu.Name, raw))
+		case "thinking":
+			th := block.AsThinking()
+			resp.Content = append(resp.Content, domain.ThinkingBlock(th.Thinking, th.Signature))
+		case "redacted_thinking":
+			resp.Content = append(resp.Content, domain.RedactedThinkingBlock(block.AsRedactedThinking().Data))
 		}
 	}
 	return resp

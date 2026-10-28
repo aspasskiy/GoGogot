@@ -35,6 +35,8 @@ func estimateBlocksChars(blocks []domain.ContentBlock) int {
 			n += len(b.ToolOutput)
 		case domain.BlockImage:
 			n += 1000
+		case domain.BlockThinking, domain.BlockRedactedThinking:
+			n += len(b.Text) + len(b.Signature)
 		}
 	}
 	return n
