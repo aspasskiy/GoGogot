@@ -1,0 +1,9 @@
+{
+  "command": ["python3", "bridge.py"],
+  "requires_env": ["TELEGRAM_BOT_TOKEN"],
+  "owner_env": "TELEGRAM_OWNER_ID",
+  "format": "telegram_html",
+  "max_message_len": 4000,
+  "can_edit": true,
+  "buttons": true
+}

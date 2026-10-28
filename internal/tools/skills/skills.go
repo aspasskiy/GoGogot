@@ -2,7 +2,10 @@ package skills
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/aspasskiy/gogogot/internal/store"
@@ -132,7 +135,7 @@ func SkillTools(st store.Store) []types.Tool {
 		{
 			Name:        "skill_delete",
 			Label:       "Deleting skill",
-			Description: "Delete a skill and its entire directory. Use when a skill is obsolete or incorrect.",
+			Description: "Delete a skill and its entire directory. Use when a skill is obsolete or incorrect. Channel skills (with a channel.json) must be disabled first.",
 			Parameters: map[string]any{
 				"name": map[string]any{
 					"type":        "string",
@@ -145,6 +148,9 @@ func SkillTools(st store.Store) []types.Tool {
 				if err != nil {
 					return types.ErrResult(err)
 				}
+				if isChannelSkill(st, name) {
+					return types.Result{Output: fmt.Sprintf("skill %q is a channel: set \"enabled\": false in its channel.json and run channel_restart first, so it is not deleted while running", name), IsErr: true}
+				}
 				if err := st.DeleteSkill(name); err != nil {
 					return types.Result{Output: "error deleting skill: " + err.Error(), IsErr: true}
 				}
@@ -152,4 +158,27 @@ func SkillTools(st store.Store) []types.Tool {
 			},
 		},
 	}
+}
+
+// isChannelSkill reports whether the named skill is an enabled channel skill.
+func isChannelSkill(st store.Store, name string) bool {
+	loaded, err := st.LoadSkills()
+	if err != nil {
+		return false
+	}
+	for _, sk := range loaded {
+		if sk.Name != name && filepath.Base(sk.Dir) != name {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(sk.Dir, "channel.json"))
+		if err != nil {
+			return false
+		}
+		var m struct {
+			Enabled *bool `json:"enabled"`
+		}
+		_ = json.Unmarshal(data, &m)
+		return m.Enabled == nil || *m.Enabled
+	}
+	return false
 }

@@ -30,6 +30,7 @@ func SystemPrompt(ctx PromptContext) string {
 		buildMemorySection(),
 		buildRecallSection(),
 		buildSkillsSection(ctx.SkillsBlock),
+		buildChannelsSection(),
 		buildSystemAccessSection(),
 		buildSchedulingSection(),
 		buildDockerSection(),
@@ -144,6 +145,18 @@ commands, API calls, gotchas — so you do it better and faster next time.
 Skills are NOT for facts (use memory for that). Skills are for procedures.`
 }
 
+func buildChannelsSection() string {
+	return `CHANNELS: The owner reaches you through channels (see transport in RUNTIME).
+Your replies, send_file and scheduled-task results go out through them — never
+call a messaging API yourself to talk to the owner.
+You can connect yourself to a new interface (Discord, Slack, email, a web chat...)
+by writing a channel skill: a skill with a channel.json whose bridge program
+relays messages. Read the add-channel skill first; use channel_list,
+channel_restart and channel_logs to run and debug channels.
+Never weaken the owner check of a channel, and do not change the channel you
+are talking through without the owner's go-ahead.`
+}
+
 func buildSystemAccessSection() string {
 	return `SYSTEM ACCESS: You run inside a Docker container (Ubuntu).
 Everything outside mounted volumes is EPHEMERAL — lost on container restart.
@@ -170,7 +183,7 @@ instruction for yourself — write it as you would a note to your future self.
 WRITING COMMANDS:
 - Good: "Check server status, summarize any issues, send a report to the owner"
 - Good: "Follow skill 'deploy-check' to verify all services are healthy"
-- Bad: writing a bash script that curls Telegram API or runs a local LLM
+- Bad: writing a bash script that curls the Telegram API or runs a local LLM
 - The command is NOT executed as a shell command — it is your instruction.
 
 USE SKILLS FOR COMPLEX TASKS: If a scheduled task involves multiple steps

@@ -1,4 +1,4 @@
-package telegram
+package render
 
 import (
 	"context"
@@ -85,7 +85,13 @@ func (r *replier) ConsumeEvents(ctx context.Context, events <-chan transport.Eve
 			flushTimer = nil
 			flushCh = nil
 		}
-		if pending == nil || statusID == 0 {
+		if pending == nil {
+			return
+		}
+		if statusID == "" {
+			// No live status message: keep the typing indicator alive instead.
+			_ = r.SendTyping(ctx)
+			pending = nil
 			return
 		}
 		text := formatStatus(*pending)
@@ -111,10 +117,7 @@ func (r *replier) ConsumeEvents(ctx context.Context, events <-chan transport.Eve
 		}
 	}
 
-	restoreStatus := func() int {
-		if statusID == 0 {
-			return 0
-		}
+	restoreStatus := func() string {
 		return r.sendStatus(ctx, transport.AgentStatus{
 			Phase: transport.PhaseWorking,
 			Plan:  currentPlan,
@@ -127,9 +130,7 @@ func (r *replier) ConsumeEvents(ctx context.Context, events <-chan transport.Eve
 			if !ok {
 				// Channel closed without a terminal Done/Error — the run was
 				// cancelled. Clean up the dangling status message.
-				if statusID != 0 {
-					r.deleteStatus(context.Background(), statusID)
-				}
+				r.deleteStatus(context.Background(), statusID)
 				return ""
 			}
 
@@ -169,9 +170,7 @@ func (r *replier) ConsumeEvents(ctx context.Context, events <-chan transport.Eve
 
 			case transport.AskEvent:
 				flush()
-				if statusID != 0 {
-					r.deleteStatus(ctx, statusID)
-				}
+				r.deleteStatus(ctx, statusID)
 				_ = r.SendAsk(ctx, e.Prompt, e.Kind, e.Options)
 
 				if replyInbox != nil {
@@ -199,9 +198,7 @@ func (r *replier) ConsumeEvents(ctx context.Context, events <-chan transport.Eve
 				if ctx.Err() != nil {
 					return ""
 				}
-				if statusID != 0 {
-					r.deleteStatus(ctx, statusID)
-				}
+				r.deleteStatus(ctx, statusID)
 				_ = r.SendText(ctx, "Error: "+e.Error)
 				return ""
 

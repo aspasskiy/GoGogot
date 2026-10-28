@@ -34,7 +34,8 @@ deploy/.env
 deploy/deploy.sh
 
 # Data / state
-data/
+/data/
+internal/data/soul/
 *.log
 tmp/
 docs/

@@ -14,6 +14,56 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// ExpandAttachments prepares a received message for the agent: zip and tar.gz
+// archives are replaced by the text and image files inside them, text files are
+// inlined into the message, and a message with only files gets a default
+// question. Channels call it before handing the message to the engine.
+func ExpandAttachments(text string, attachments []Attachment) (string, []Attachment) {
+	text = strings.TrimSpace(text)
+
+	var expanded []Attachment
+	for _, att := range attachments {
+		if !IsArchive(att.MimeType, att.Filename) {
+			expanded = append(expanded, att)
+			continue
+		}
+		var (
+			files []Attachment
+			err   error
+		)
+		if isArchiveZip(att.MimeType, att.Filename) {
+			files, err = extractZipFiles(att.Data)
+		} else {
+			files, err = extractTarGzFiles(att.Data)
+		}
+		if err != nil {
+			log.Error().Err(err).Str("file", att.Filename).Msg("failed to unpack archive")
+			continue
+		}
+		expanded = append(expanded, files...)
+	}
+
+	var fileTexts []string
+	for _, att := range expanded {
+		if !strings.HasPrefix(att.MimeType, "image/") && IsTextMIME(att.MimeType) {
+			fileTexts = append(fileTexts, fmt.Sprintf("[File: %s]\n```\n%s\n```", att.Filename, string(att.Data)))
+		}
+	}
+	if len(fileTexts) > 0 {
+		filesStr := strings.Join(fileTexts, "\n\n")
+		if text != "" {
+			text = filesStr + "\n\n" + text
+		} else {
+			text = filesStr
+		}
+	}
+
+	if text == "" && len(expanded) > 0 {
+		text = "What's in these files?"
+	}
+	return text, expanded
+}
+
 func ProcessAttachments(chatID, task string, attachments []Attachment) ([]domain.ContentBlock, func()) {
 	if len(attachments) == 0 {
 		return []domain.ContentBlock{domain.TextBlock(task)}, func() {}

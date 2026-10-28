@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+// TelegramConfig is read only to validate the setup early: the telegram
+// channel skill itself takes these from the environment.
 type TelegramConfig struct {
 	Token   string
 	OwnerID int64
@@ -29,7 +31,12 @@ type SchedulerConfig struct {
 }
 
 type Config struct {
-	Transport   string // "telegram" (the only transport so far)
+	// Transport says what the owner talks through, comma-separated:
+	// "terminal", "telegram" (requires the telegram channel skill to start), or
+	// "auto" (the default) — the terminal when running interactively. Channel
+	// skills, telegram included, start on their own according to their
+	// channel.json and the env vars it requires.
+	Transport   string
 	DataDir     string
 	LogLevel    string
 	BraveAPIKey string
@@ -48,7 +55,7 @@ func envDefault(key, fallback string) string {
 
 func Load() (*Config, error) {
 	cfg := &Config{
-		Transport:   envDefault("GOGOGOT_TRANSPORT", "telegram"),
+		Transport:   envDefault("GOGOGOT_TRANSPORT", "auto"),
 		BraveAPIKey: os.Getenv("BRAVE_API_KEY"),
 		DataDir:     os.Getenv("GOGOGOT_DATA_DIR"),
 		LogLevel:    envDefault("LOG_LEVEL", "debug"),

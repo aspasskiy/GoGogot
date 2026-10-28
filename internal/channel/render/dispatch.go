@@ -1,4 +1,4 @@
-package telegram
+package render
 
 import (
 	"context"
@@ -6,11 +6,68 @@ import (
 	"strings"
 
 	"github.com/aspasskiy/gogogot/internal/channel"
-	"github.com/aspasskiy/gogogot/internal/channel/telegram/client"
 	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
 	"github.com/aspasskiy/gogogot/internal/transport"
+
+	"github.com/rs/zerolog/log"
 )
+
+// Inbound is one user message as a channel received it, before routing.
+type Inbound struct {
+	Chat        string
+	Text        string
+	Attachments []transport.Attachment
+}
+
+// Dispatch routes an inbound message: archives are unpacked and text files
+// inlined, slash commands are executed and answered here, and everything else
+// goes to the engine's handler with a replier for the chat.
+func Dispatch(ctx context.Context, h channel.Handler, s Surface, in Inbound) {
+	text, attachments := transport.ExpandAttachments(in.Text, in.Attachments)
+	if text == "" && len(attachments) == 0 {
+		return
+	}
+
+	reply := NewReplier(s, in.Chat)
+	if strings.HasPrefix(text, "/") {
+		cmd := strings.Fields(text)[0]
+		if at := strings.IndexByte(cmd, '@'); at > 0 {
+			cmd = cmd[:at] // "/new@my_bot" in group chats
+		}
+		log.Info().Str("cmd", cmd).Msg("command received")
+		RunCommand(ctx, h, reply, cmd)
+		return
+	}
+
+	h(ctx, channel.Message{
+		Text:        text,
+		Attachments: attachments,
+		Reply:       reply,
+	})
+}
+
+// Commands lists the slash commands every channel supports, for help texts
+// and platform command menus.
+var Commands = []struct{ Name, Description string }{
+	{"new", "Start a fresh conversation"},
+	{"history", "View past conversations"},
+	{"memory", "List memory files"},
+	{"soul", "Show agent identity (soul.md)"},
+	{"user", "Show user profile (user.md)"},
+	{"stop", "Cancel the current task"},
+	{"help", "Show available commands"},
+}
+
+// HelpText is the reply to /help.
+func HelpText() string {
+	var b strings.Builder
+	b.WriteString("**Commands:**\n")
+	for _, c := range Commands {
+		fmt.Fprintf(&b, "/%s — %s\n", c.Name, strings.ToLower(c.Description[:1])+c.Description[1:])
+	}
+	return b.String()
+}
 
 var commandMap = map[string]string{
 	"/start":   channel.CmdNewChat,
@@ -33,50 +90,44 @@ var commandEmpty = map[string]string{
 	channel.CmdUser:    "User profile not configured yet — no user.md.",
 }
 
-func (c *Channel) handleCommand(ctx context.Context, chatID int64, reply transport.Replier, cmdText string) {
+// RunCommand executes one slash command (e.g. "/new") and sends the answer.
+func RunCommand(ctx context.Context, h channel.Handler, reply transport.Replier, cmdText string) {
 	if cmdText == "/help" {
-		c.send(ctx, chatID, "*Commands:*\n"+
-			"/new — start a fresh conversation\n"+
-			"/history — view past conversations\n"+
-			"/memory — list memory files\n"+
-			"/soul — show agent identity\n"+
-			"/user — show user profile\n"+
-			"/stop — cancel the current task\n"+
-			"/help — show this help")
+		_ = reply.SendText(ctx, HelpText())
 		return
 	}
 
 	name, ok := commandMap[cmdText]
 	if !ok {
-		c.send(ctx, chatID, "Unknown command\\. Try /help")
+		_ = reply.SendText(ctx, "Unknown command. Try /help")
 		return
 	}
 
 	cmd := &channel.Command{Name: name, Result: &channel.CommandResult{}}
-	c.handler(ctx, channel.Message{Reply: reply, Command: cmd})
+	h(ctx, channel.Message{Reply: reply, Command: cmd})
 
 	if cmd.Result.Error != nil {
-		c.send(ctx, chatID, "Error: "+client.EscapeMarkdown(cmd.Result.Error.Error()))
+		_ = reply.SendText(ctx, "Error: "+cmd.Result.Error.Error())
 		return
 	}
 
 	if text := formatPayload(cmd.Result.Payload); text != "" {
-		c.sendLong(ctx, chatID, text)
+		_ = reply.SendText(ctx, text)
 		return
 	}
 
 	if text := cmd.Result.Data["text"]; text != "" {
-		c.sendLong(ctx, chatID, text)
+		_ = reply.SendText(ctx, text)
 		return
 	}
 
 	if msg, ok := commandSuccess[name]; ok {
-		c.sendLong(ctx, chatID, msg)
+		_ = reply.SendText(ctx, msg)
 		return
 	}
 
 	if msg, ok := commandEmpty[name]; ok {
-		c.sendLong(ctx, chatID, msg)
+		_ = reply.SendText(ctx, msg)
 	}
 }
 

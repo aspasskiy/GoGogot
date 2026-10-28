@@ -1,4 +1,4 @@
-package telegram
+package transport
 
 import (
 	"archive/tar"
@@ -9,9 +9,20 @@ import (
 	"io"
 	"path/filepath"
 	"strings"
-
-	"github.com/aspasskiy/gogogot/internal/transport"
 )
+
+// Limits for files unpacked from archives.
+const (
+	maxTextFileSize   = 512 * 1024
+	maxImageFileSize  = 10 * 1024 * 1024
+	maxArchiveEntries = 20
+)
+
+// IsArchive reports whether a file is a zip or tar.gz archive that
+// ExpandAttachments unpacks.
+func IsArchive(mime, filename string) bool {
+	return isArchiveZip(mime, filename) || isArchiveTarGz(mime, filename)
+}
 
 func isArchiveZip(mime, filename string) bool {
 	return mime == "application/zip" ||
@@ -27,10 +38,6 @@ func isArchiveTarGz(mime, filename string) bool {
 		strings.HasSuffix(lower, ".tgz")
 }
 
-func isImageMIME(mime string) bool {
-	return strings.HasPrefix(mime, "image/")
-}
-
 var textMIMEs = map[string]bool{
 	"application/json":       true,
 	"application/xml":        true,
@@ -42,7 +49,8 @@ var textMIMEs = map[string]bool{
 	"application/sql":        true,
 }
 
-func isTextMIME(mime string) bool {
+// IsTextMIME reports whether a MIME type is text that gets inlined into the prompt.
+func IsTextMIME(mime string) bool {
 	return strings.HasPrefix(mime, "text/") || textMIMEs[mime]
 }
 
@@ -54,13 +62,13 @@ func shouldIncludeArchiveEntry(name string) (isText, isImage bool) {
 	return isTextExtension(lower), isImageExtension(lower)
 }
 
-func extractZipFiles(data []byte) ([]transport.Attachment, error) {
+func extractZipFiles(data []byte) ([]Attachment, error) {
 	reader, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read zip: %w", err)
 	}
 
-	var attachments []transport.Attachment
+	var attachments []Attachment
 	for _, file := range reader.File {
 		if file.FileInfo().IsDir() {
 			continue
@@ -86,7 +94,7 @@ func extractZipFiles(data []byte) ([]transport.Attachment, error) {
 			continue
 		}
 
-		attachments = append(attachments, transport.Attachment{
+		attachments = append(attachments, Attachment{
 			Filename: file.Name,
 			MimeType: mimeFromExtension(strings.ToLower(file.Name), isImage),
 			Data:     content,
@@ -99,7 +107,7 @@ func extractZipFiles(data []byte) ([]transport.Attachment, error) {
 	return attachments, nil
 }
 
-func extractTarGzFiles(data []byte) ([]transport.Attachment, error) {
+func extractTarGzFiles(data []byte) ([]Attachment, error) {
 	gzr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read gzip: %w", err)
@@ -107,7 +115,7 @@ func extractTarGzFiles(data []byte) ([]transport.Attachment, error) {
 	defer func() { _ = gzr.Close() }()
 
 	tr := tar.NewReader(gzr)
-	var attachments []transport.Attachment
+	var attachments []Attachment
 
 	for {
 		header, err := tr.Next()
@@ -137,7 +145,7 @@ func extractTarGzFiles(data []byte) ([]transport.Attachment, error) {
 			continue
 		}
 
-		attachments = append(attachments, transport.Attachment{
+		attachments = append(attachments, Attachment{
 			Filename: header.Name,
 			MimeType: mimeFromExtension(strings.ToLower(header.Name), isImage),
 			Data:     content,
