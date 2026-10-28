@@ -294,10 +294,7 @@ for line in sys.stdin:
 	case <-time.After(300 * time.Millisecond):
 	}
 
-	logs, err := m.Logs("leaky")
-	if err != nil || len(logs) == 0 || logs[0] != "bridge up" {
-		t.Errorf("logs = %q, %v", logs, err)
-	}
+	waitLog(t, m, "leaky", "bridge up")
 }
 
 func TestReloadAppliesChanges(t *testing.T) {
@@ -411,10 +408,7 @@ for line in sys.stdin:
 	if err := d.msg.Reply.SendText(d.ctx, "restarted"); err != nil {
 		t.Fatalf("SendText: %v", err)
 	}
-	logs, _ := m.Logs("self")
-	if len(logs) == 0 || logs[len(logs)-1] != "v2 got send: restarted" {
-		t.Fatalf("logs = %q, want the reply handled by the new process", logs)
-	}
+	waitLog(t, m, "self", "v2 got send: restarted")
 }
 
 // TestRollbackAfterCrashLoop breaks the bundled telegram bridge the way a bad
@@ -461,4 +455,20 @@ func TestRollbackAfterCrashLoop(t *testing.T) {
 	}
 	s, _ := m.Status("telegram")
 	t.Fatalf("telegram did not come back: %+v", s)
+}
+
+// waitLog waits for a bridge's stderr to contain line. stderr is read apart
+// from stdout, so a log line may arrive after the response it precedes.
+func waitLog(t *testing.T, m *bridge.Manager, name, line string) {
+	t.Helper()
+	var logs []string
+	for deadline := time.Now().Add(5 * time.Second); time.Now().Before(deadline); time.Sleep(20 * time.Millisecond) {
+		logs, _ = m.Logs(name)
+		for _, l := range logs {
+			if l == line {
+				return
+			}
+		}
+	}
+	t.Fatalf("%s logs = %q, want %q", name, logs, line)
 }
