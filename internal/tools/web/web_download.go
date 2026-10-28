@@ -71,7 +71,7 @@ func webDownload(ctx context.Context, input map[string]any) types.Result {
 	if err != nil {
 		return types.Errf("http error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return types.Errf("HTTP %d for %s", resp.StatusCode, rawURL)
@@ -85,11 +85,12 @@ func webDownload(ctx context.Context, input map[string]any) types.Result {
 	if err != nil {
 		return types.Errf("create file error: %v", err)
 	}
-	defer f.Close()
-
 	written, err := io.Copy(f, io.LimitReader(resp.Body, maxDownloadSize))
+	if closeErr := f.Close(); err == nil {
+		err = closeErr
+	}
 	if err != nil {
-		os.Remove(dest)
+		_ = os.Remove(dest)
 		return types.Errf("download error: %v", err)
 	}
 

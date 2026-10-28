@@ -14,7 +14,7 @@ type LocalStore struct {
 
 var _ store.Store = (*LocalStore)(nil)
 
-func New(dataDir string) (store.Store, error) {
+func New(dataDir string) (*LocalStore, error) {
 	s := &LocalStore{dataDir: dataDir}
 	if err := s.ensureDirs(); err != nil {
 		return nil, err

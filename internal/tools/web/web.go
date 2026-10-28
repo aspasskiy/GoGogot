@@ -72,7 +72,7 @@ func webSearch(ctx context.Context, input map[string]any, apiKey string) types.R
 	if err != nil {
 		return types.Errf("http error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(io.LimitReader(resp.Body, 512*1024))
 	if err != nil {

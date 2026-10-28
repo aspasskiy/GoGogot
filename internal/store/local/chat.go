@@ -48,7 +48,7 @@ func (s *LocalStore) SaveChat(ch *store.Chat) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(p, data, 0o644)
+	return writeFileAtomic(p, data, 0o644)
 }
 
 func (s *LocalStore) LoadChat(id string) (*store.Chat, error) {

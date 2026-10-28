@@ -58,6 +58,10 @@ func ProcessAttachments(chatID, task string, attachments []Attachment) ([]domain
 	blocks = append(blocks, domain.TextBlock(text))
 	blocks = append(blocks, imageBlocks...)
 
-	cleanup := func() { os.RemoveAll(tmpDir) }
+	cleanup := func() {
+		if err := os.RemoveAll(tmpDir); err != nil {
+			log.Warn().Err(err).Str("dir", tmpDir).Msg("failed to remove upload dir")
+		}
+	}
 	return blocks, cleanup
 }

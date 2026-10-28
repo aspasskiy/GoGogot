@@ -2,8 +2,11 @@ package local
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/aspasskiy/gogogot/internal/domain"
@@ -29,7 +32,7 @@ func (s *LocalStore) LoadMessages(ch *store.Chat) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	scanner.Buffer(make([]byte, 0, 64*1024), 10*1024*1024)
@@ -57,45 +60,75 @@ func (s *LocalStore) LoadMessages(ch *store.Chat) error {
 	return scanner.Err()
 }
 
-func (s *LocalStore) AppendMessage(ch *store.Chat, msg domain.Turn) {
+func (s *LocalStore) AppendMessage(ch *store.Chat, msg domain.Turn) error {
 	path := s.messagesPath(ch)
 	if path == "" {
-		return
+		return nil
 	}
 	line, err := json.Marshal(turnToJSON(msg))
 	if err != nil {
-		log.Error().Err(err).Msg("chat: failed to marshal message for JSONL")
-		return
+		return fmt.Errorf("marshal message: %w", err)
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		log.Error().Err(err).Msg("chat: failed to open JSONL for append")
-		return
+		return fmt.Errorf("open messages file: %w", err)
 	}
-	defer f.Close()
 	line = append(line, '\n')
-	f.Write(line)
+	if _, err := f.Write(line); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("append message: %w", err)
+	}
+	return f.Close()
 }
 
+// ReplaceMessages rewrites the whole history. It writes to a temporary file
+// and renames it over the original, so a crash mid-write never leaves a
+// truncated history behind.
 func (s *LocalStore) ReplaceMessages(ch *store.Chat, msgs []domain.Turn) error {
 	path := s.messagesPath(ch)
 	if path == "" {
 		return nil
 	}
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
+
+	var buf bytes.Buffer
 	for _, msg := range msgs {
 		line, err := json.Marshal(turnToJSON(msg))
 		if err != nil {
-			continue
+			return fmt.Errorf("marshal message: %w", err)
 		}
-		f.Write(line)
-		f.Write([]byte{'\n'})
+		buf.Write(line)
+		buf.WriteByte('\n')
 	}
-	return nil
+	return writeFileAtomic(path, buf.Bytes(), 0o644)
+}
+
+// writeFileAtomic writes data to a temp file in the same directory, syncs it
+// and renames it over path.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	if err := os.Chmod(tmpName, perm); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	return os.Rename(tmpName, path)
 }
 
 func (s *LocalStore) TextMessages(ch *store.Chat) ([]store.Message, error) {
@@ -106,7 +139,7 @@ func (s *LocalStore) TextMessages(ch *store.Chat) ([]store.Message, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var msgs []store.Message
 	scanner := bufio.NewScanner(f)

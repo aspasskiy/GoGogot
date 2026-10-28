@@ -143,8 +143,8 @@ func splitSkillYAMLLine(line string) (key, val string, ok bool) {
 func formatSkillMd(name, description, body string) string {
 	var b strings.Builder
 	b.WriteString("---\n")
-	b.WriteString(fmt.Sprintf("name: %s\n", name))
-	b.WriteString(fmt.Sprintf("description: %q\n", description))
+	fmt.Fprintf(&b, "name: %s\n", name)
+	fmt.Fprintf(&b, "description: %q\n", description)
 	b.WriteString("---\n\n")
 	if body != "" {
 		b.WriteString(body)

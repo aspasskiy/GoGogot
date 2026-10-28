@@ -20,18 +20,17 @@ type LLM interface {
 	ModelID() string
 	ModelLabel() string
 	ContextWindow() int
-	InputPricePerM() float64
-	OutputPricePerM() float64
+	Pricing() domain.Pricing
 }
 
 type CallOptions struct {
-	System       string
-	SystemAppend string
-	Memory       string
-	NoTools      bool
-	ExtraTools   []domain.ToolDef
-	MaxTokens    int
+	System     string
+	NoTools    bool
+	ExtraTools []domain.ToolDef
+	MaxTokens  int // overrides the provider default when > 0
 }
+
+const defaultMaxTokens = 4096
 
 type Client struct {
 	adapter  Adapter
@@ -45,9 +44,9 @@ func NewClient(p Provider, toolDefs []domain.ToolDef) *Client {
 	var adapter Adapter
 	switch p.Format {
 	case "openai":
-		adapter = oaipkg.NewAdapter(p.BaseURL, p.APIKey, p.SupportsVision)
+		adapter = oaipkg.NewAdapter(p.BaseURL, p.APIKey, p.SupportsVision, p.CacheControl)
 	default:
-		adapter = anthpkg.NewAdapter(p.APIKey, p.BaseURL)
+		adapter = anthpkg.NewAdapter(p.APIKey, p.BaseURL, p.CacheControl)
 	}
 
 	return &Client{
@@ -83,23 +82,16 @@ func (c *Client) ContextWindow() int {
 	return c.provider.ContextWindow
 }
 
-func (c *Client) InputPricePerM() float64 {
-	return c.provider.InputPricePerM
-}
-
-func (c *Client) OutputPricePerM() float64 {
-	return c.provider.OutputPricePerM
+func (c *Client) Pricing() domain.Pricing {
+	return domain.Pricing{
+		InputPerM:      c.provider.InputPricePerM,
+		OutputPerM:     c.provider.OutputPricePerM,
+		CacheReadPerM:  c.provider.CacheReadPricePerM,
+		CacheWritePerM: c.provider.CacheWritePricePerM,
+	}
 }
 
 func (c *Client) Call(ctx context.Context, messages []domain.Message, opts CallOptions) (*domain.Response, error) {
-	sys := opts.System
-	if opts.SystemAppend != "" {
-		sys += "\n\n" + opts.SystemAppend
-	}
-	if opts.Memory != "" {
-		sys += "\n\n## Current Memory\n" + opts.Memory
-	}
-
 	var tools []domain.ToolDef
 	if !opts.NoTools {
 		tools = c.tools
@@ -110,10 +102,13 @@ func (c *Client) Call(ctx context.Context, messages []domain.Message, opts CallO
 
 	maxTokens := opts.MaxTokens
 	if maxTokens <= 0 {
-		maxTokens = 4096
+		maxTokens = c.provider.MaxTokens
+	}
+	if maxTokens <= 0 {
+		maxTokens = defaultMaxTokens
 	}
 
 	callCtx, cancel := c.callCtx(ctx)
 	defer cancel()
-	return c.adapter.Call(callCtx, c.model, sys, messages, tools, maxTokens)
+	return c.adapter.Call(callCtx, c.model, opts.System, messages, tools, maxTokens)
 }

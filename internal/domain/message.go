@@ -48,8 +48,38 @@ type Response struct {
 	ID           string
 	Content      []ContentBlock
 	StopReason   string // "end_turn", "tool_use", "max_tokens"
-	InputTokens  int
+	InputTokens  int    // input tokens billed at the plain input price
 	OutputTokens int
+
+	// Prompt-cache accounting; not included in InputTokens. Zero for models
+	// without caching.
+	CacheReadTokens  int
+	CacheWriteTokens int
+}
+
+// Pricing holds a model's USD prices per million tokens. A zero cache price
+// means the model has no separate cache rate (or it is unknown), and those
+// tokens are billed at the plain input price.
+type Pricing struct {
+	InputPerM      float64
+	OutputPerM     float64
+	CacheReadPerM  float64
+	CacheWritePerM float64
+}
+
+// Cost estimates the USD cost of one response.
+func (p Pricing) Cost(resp *Response) float64 {
+	readPerM, writePerM := p.CacheReadPerM, p.CacheWritePerM
+	if readPerM == 0 {
+		readPerM = p.InputPerM
+	}
+	if writePerM == 0 {
+		writePerM = p.InputPerM
+	}
+	return (float64(resp.InputTokens)*p.InputPerM +
+		float64(resp.CacheReadTokens)*readPerM +
+		float64(resp.CacheWriteTokens)*writePerM +
+		float64(resp.OutputTokens)*p.OutputPerM) / 1_000_000
 }
 
 func TextBlock(text string) ContentBlock {
@@ -76,6 +106,20 @@ func ExtractText(blocks []ContentBlock) string {
 		}
 	}
 	return s
+}
+
+// IsToolResultTurn reports whether blocks carry only tool results — a
+// user-role turn the agent produced, not a message the user typed.
+func IsToolResultTurn(blocks []ContentBlock) bool {
+	if len(blocks) == 0 {
+		return false
+	}
+	for _, b := range blocks {
+		if b.Type != BlockToolResult {
+			return false
+		}
+	}
+	return true
 }
 
 func NewUserMessage(blocks ...ContentBlock) Message {

@@ -4,13 +4,15 @@ TAG   := latest
 
 .PHONY: run build clean lint generate docker-build docker-push docker-release deploy tag
 
+# Refresh the embedded OpenRouter model catalog (network). Run on demand and
+# commit the result; builds use the committed copy.
 generate:
 	curl -sf https://openrouter.ai/api/v1/models -o internal/llm/catalog/openrouter_models.json
 
 run:
 	go run ./cmd/gogogot $(ARGS)
 
-build: generate
+build:
 	go build -o $(BIN) ./cmd/gogogot
 
 clean:

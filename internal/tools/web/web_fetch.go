@@ -76,7 +76,7 @@ func webFetch(ctx context.Context, input map[string]any) types.Result {
 	if err != nil {
 		return types.Errf("http error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return types.Errf("HTTP %d for %s", resp.StatusCode, rawURL)

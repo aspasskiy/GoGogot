@@ -211,7 +211,7 @@ func (w *htmlWriter) walkNode(n ast.Node, source []byte) {
 		}
 
 	case *ast.Image:
-		w.writeText(string(node.Text(source)))
+		w.writeText(extractNodeText(node, source))
 
 	case *ast.Text:
 		w.writeText(string(node.Segment.Value(source)))

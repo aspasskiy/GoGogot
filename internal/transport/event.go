@@ -10,21 +10,15 @@ import (
 //
 // Consumers switch on the concrete type instead of inspecting an untyped
 // Data any payload — the compiler now catches mismatched field access.
+// Which events are persisted is decided by the orchestrator's sink.
 type Event interface {
 	isEvent()
-	// Persistent reports whether the event mutates conversation history and
-	// must be written to the store. Persistent events are never dropped; the
-	// orchestrator writes them synchronously. Non-persistent (UI) events may
-	// be coalesced or dropped under backpressure.
-	Persistent() bool
 }
 
-// BaseEvent is embedded by every concrete event. It supplies the sealing
-// marker and the default Persistent() == false; persistent events override it.
+// BaseEvent is embedded by every concrete event and supplies the sealing marker.
 type BaseEvent struct{}
 
-func (BaseEvent) isEvent()         {}
-func (BaseEvent) Persistent() bool { return false }
+func (BaseEvent) isEvent() {}
 
 // --- Persistent events (written to the store) ---
 
@@ -35,8 +29,6 @@ type MessageEvent struct {
 	Turn domain.Turn
 }
 
-func (MessageEvent) Persistent() bool { return true }
-
 // CompactionEvent carries the rewritten history after the compaction hook
 // summarized older messages. Messages is the new full slice the store rewrites
 // in place (store.ReplaceMessages); BeforeTokens/AfterTokens are for logging.
@@ -46,8 +38,6 @@ type CompactionEvent struct {
 	BeforeTokens int
 	AfterTokens  int
 }
-
-func (CompactionEvent) Persistent() bool { return true }
 
 // --- UI events (rendered by the channel, never persisted) ---
 

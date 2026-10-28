@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -18,16 +18,17 @@ import (
 type Adapter struct {
 	client         *openai.Client
 	supportsVision bool
+	cacheControl   bool // add cache_control breakpoints (Claude via OpenRouter)
 }
 
-func NewAdapter(baseURL, apiKey string, supportsVision bool) *Adapter {
-	httpClient := &http.Client{Timeout: 5 * time.Minute}
+// NewAdapter builds the OpenAI-compatible adapter. Request deadlines come from
+// the caller's context (llm.Client applies the configured per-call timeout).
+func NewAdapter(baseURL, apiKey string, supportsVision, cacheControl bool) *Adapter {
 	c := openai.NewClient(
 		oaioption.WithBaseURL(baseURL),
 		oaioption.WithAPIKey(apiKey),
-		oaioption.WithHTTPClient(httpClient),
 	)
-	return &Adapter{client: &c, supportsVision: supportsVision}
+	return &Adapter{client: &c, supportsVision: supportsVision, cacheControl: cacheControl}
 }
 
 func (a *Adapter) Call(
@@ -41,6 +42,9 @@ func (a *Adapter) Call(
 	reasoning := isReasoningModel(model)
 	oaiMsgs := messagesToOpenAI(a.supportsVision, reasoning, systemPrompt, messages)
 	oaiTools := toolDefsToOpenAI(tools)
+	if a.cacheControl {
+		addCacheBreakpoints(oaiMsgs)
+	}
 
 	params := openai.ChatCompletionNewParams{
 		Model:    shared.ChatModel(model),
@@ -62,6 +66,50 @@ func (a *Adapter) Call(
 	}
 
 	return openaiToResponse(resp), nil
+}
+
+// cacheControlField is the OpenRouter extension that marks a prompt-cache
+// breakpoint on a text content part.
+var cacheControlField = map[string]any{"cache_control": map[string]any{"type": "ephemeral"}}
+
+// addCacheBreakpoints marks the system prompt and the newest message for
+// prompt caching, for models that cache only at explicit breakpoints. Their
+// string contents are converted to a single text part, which is where the
+// breakpoint lives.
+func addCacheBreakpoints(msgs []openai.ChatCompletionMessageParamUnion) {
+	if len(msgs) == 0 {
+		return
+	}
+	if sys := msgs[0].OfSystem; sys != nil && sys.Content.OfString.Valid() {
+		part := openai.ChatCompletionContentPartTextParam{Text: sys.Content.OfString.Value}
+		part.SetExtraFields(cacheControlField)
+		sys.Content = openai.ChatCompletionSystemMessageParamContentUnion{
+			OfArrayOfContentParts: []openai.ChatCompletionContentPartTextParam{part},
+		}
+	}
+
+	switch last := msgs[len(msgs)-1]; {
+	case last.OfTool != nil && last.OfTool.Content.OfString.Valid():
+		part := openai.ChatCompletionContentPartTextParam{Text: last.OfTool.Content.OfString.Value}
+		part.SetExtraFields(cacheControlField)
+		last.OfTool.Content = openai.ChatCompletionToolMessageParamContentUnion{
+			OfArrayOfContentParts: []openai.ChatCompletionContentPartTextParam{part},
+		}
+	case last.OfUser != nil && last.OfUser.Content.OfString.Valid():
+		part := openai.ChatCompletionContentPartTextParam{Text: last.OfUser.Content.OfString.Value}
+		part.SetExtraFields(cacheControlField)
+		last.OfUser.Content = openai.ChatCompletionUserMessageParamContentUnion{
+			OfArrayOfContentParts: []openai.ChatCompletionContentPartUnionParam{{OfText: &part}},
+		}
+	case last.OfUser != nil:
+		parts := last.OfUser.Content.OfArrayOfContentParts
+		for i := len(parts) - 1; i >= 0; i-- {
+			if parts[i].OfText != nil {
+				parts[i].OfText.SetExtraFields(cacheControlField)
+				break
+			}
+		}
+	}
 }
 
 func isReasoningModel(model string) bool {
@@ -184,10 +232,20 @@ func toolDefsToOpenAI(defs []domain.ToolDef) []openai.ChatCompletionToolParam {
 }
 
 func openaiToResponse(resp *openai.ChatCompletion) *domain.Response {
+	// prompt_tokens includes cached tokens; split them out so each is priced
+	// at its own rate. cache_write_tokens is an OpenRouter extension.
+	details := resp.Usage.PromptTokensDetails
+	cacheRead := int(details.CachedTokens)
+	var cacheWrite int
+	if f, ok := details.JSON.ExtraFields["cache_write_tokens"]; ok {
+		cacheWrite, _ = strconv.Atoi(f.Raw())
+	}
 	r := &domain.Response{
-		ID:           resp.ID,
-		InputTokens:  int(resp.Usage.PromptTokens),
-		OutputTokens: int(resp.Usage.CompletionTokens),
+		ID:               resp.ID,
+		InputTokens:      max(int(resp.Usage.PromptTokens)-cacheRead-cacheWrite, 0),
+		OutputTokens:     int(resp.Usage.CompletionTokens),
+		CacheReadTokens:  cacheRead,
+		CacheWriteTokens: cacheWrite,
 	}
 
 	if len(resp.Choices) == 0 {

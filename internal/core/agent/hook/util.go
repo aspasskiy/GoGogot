@@ -9,11 +9,6 @@ import (
 	"github.com/aspasskiy/gogogot/internal/domain"
 )
 
-func CalcCost(inputPerM, outputPerM float64, inputTokens, outputTokens int) float64 {
-	return float64(inputTokens)/1_000_000*inputPerM +
-		float64(outputTokens)/1_000_000*outputPerM
-}
-
 func formatDuration(d time.Duration) string {
 	switch {
 	case d < time.Second:
@@ -25,19 +20,6 @@ func formatDuration(d time.Duration) string {
 		s := int(d.Seconds()) % 60
 		return fmt.Sprintf("%dm%ds", m, s)
 	}
-}
-
-func textFromBlocks(blocks []domain.ContentBlock) string {
-	var sb strings.Builder
-	for _, b := range blocks {
-		if b.Type == domain.BlockText && b.Text != "" {
-			if sb.Len() > 0 {
-				sb.WriteByte(' ')
-			}
-			sb.WriteString(b.Text)
-		}
-	}
-	return sb.String()
 }
 
 const separator = "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,11 @@ import (
 	"github.com/robfig/cron/v3"
 	"github.com/rs/zerolog/log"
 )
+
+// ErrBusy is returned by a TaskExecutor that could not start the task because
+// the agent stayed busy for the whole task timeout. Such a run is recorded as
+// skipped, not failed, so it does not trigger error backoff.
+var ErrBusy = errors.New("agent busy")
 
 type TaskExecutor func(ctx context.Context, taskID, command, skill string) (string, error)
 
@@ -40,7 +46,7 @@ func (o Options) maxConcurrent() int {
 	if o.MaxConcurrent > 0 {
 		return o.MaxConcurrent
 	}
-	return 2
+	return 1
 }
 
 type TaskState struct {
@@ -264,7 +270,13 @@ func (s *Scheduler) makeRunner(id, command, skill string) func() {
 			LastDurationMs: elapsed.Milliseconds(),
 		}
 
-		if err != nil {
+		switch {
+		case errors.Is(err, ErrBusy):
+			state.LastStatus = "skipped"
+			state.LastError = err.Error()
+			state.ConsecutiveErrors = task.State.ConsecutiveErrors
+			log.Warn().Str("id", id).Dur("waited", elapsed).Msg("scheduled task skipped: agent busy")
+		case err != nil:
 			state.LastStatus = "error"
 			state.LastError = err.Error()
 			state.ConsecutiveErrors = task.State.ConsecutiveErrors + 1
@@ -274,7 +286,7 @@ func (s *Scheduler) makeRunner(id, command, skill string) func() {
 				Int("consecutive_errors", state.ConsecutiveErrors).
 				Dur("duration", elapsed).
 				Msg("scheduled task failed")
-		} else {
+		default:
 			state.LastStatus = "ok"
 			state.ConsecutiveErrors = 0
 			log.Info().
@@ -287,7 +299,9 @@ func (s *Scheduler) makeRunner(id, command, skill string) func() {
 		s.mu.Lock()
 		if t, ok := s.tasks[id]; ok {
 			t.State = state
-			_ = s.save()
+			if err := s.save(); err != nil {
+				log.Error().Err(err).Str("id", id).Msg("scheduler: failed to save task state")
+			}
 		}
 		s.mu.Unlock()
 	}

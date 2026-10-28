@@ -25,11 +25,10 @@ func (f *fakeLLM) Call(_ context.Context, _ []domain.Message, _ llm.CallOptions)
 	return r, nil
 }
 
-func (f *fakeLLM) ModelID() string          { return "fake" }
-func (f *fakeLLM) ModelLabel() string       { return "Fake" }
-func (f *fakeLLM) ContextWindow() int       { return 100_000 }
-func (f *fakeLLM) InputPricePerM() float64  { return 0 }
-func (f *fakeLLM) OutputPricePerM() float64 { return 0 }
+func (f *fakeLLM) ModelID() string         { return "fake" }
+func (f *fakeLLM) ModelLabel() string      { return "Fake" }
+func (f *fakeLLM) ContextWindow() int      { return 100_000 }
+func (f *fakeLLM) Pricing() domain.Pricing { return domain.Pricing{} }
 
 // captureSink records every event. The agent emits from a single goroutine
 // (the one calling Run), so no synchronization is needed in the test.
@@ -112,9 +111,6 @@ func TestRunEmitsEventSequenceWithoutStore(t *testing.T) {
 	if got := domain.ExtractText(userMsg.Turn.Content); got != "hello" {
 		t.Errorf("user turn text = %q, want %q", got, "hello")
 	}
-	if !userMsg.Persistent() {
-		t.Error("MessageEvent.Persistent() = false, want true")
-	}
 
 	// The tool-result turn carries the report_status output.
 	toolMsg := sink.events[6].(transport.MessageEvent)
@@ -122,13 +118,10 @@ func TestRunEmitsEventSequenceWithoutStore(t *testing.T) {
 		t.Errorf("tool-result turn role = %q, want %q", toolMsg.Turn.Role, domain.RoleUser)
 	}
 
-	// The terminal event is Done and is non-persistent.
+	// The terminal event is Done.
 	done, ok := sink.events[len(sink.events)-1].(transport.DoneEvent)
 	if !ok {
 		t.Fatalf("last event is %T, want DoneEvent", sink.events[len(sink.events)-1])
-	}
-	if done.Persistent() {
-		t.Error("DoneEvent.Persistent() = true, want false")
 	}
 	if done.Text != "done" {
 		t.Errorf("done text = %q, want %q", done.Text, "done")

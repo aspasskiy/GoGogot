@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"sync"
+	"time"
 
 	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/llm"
@@ -35,7 +35,7 @@ func TruncTitle(s string) string {
 // SummarizeIfNeeded runs background summarization after the first user message
 // and then every summarizeInterval user messages.
 func (m *Manager) SummarizeIfNeeded(ctx context.Context, ch *store.Chat) {
-	n := ch.UserTurns
+	n := ch.UserTurnCount()
 	if n < firstSummarizeAfter {
 		return
 	}
@@ -64,16 +64,26 @@ func (m *Manager) SummarizeIfNeeded(ctx context.Context, ch *store.Chat) {
 // Close marks the chat closed. If the summary is already populated
 // (from background summarization) it skips the LLM call.
 func (m *Manager) Close(ctx context.Context, ch *store.Chat) error {
-	if ch.Summary == "" {
+	if ch.Info().Summary == "" {
 		m.summarize(ctx, ch)
 	}
-	if ch.Title == "" {
-		if msgs, err := ch.TextMessages(); err == nil && len(msgs) > 0 {
-			ch.Title = TruncTitle(msgs[0].Content)
+	fallback := fallbackTitle(ch)
+	return ch.Update(func(c *store.Chat) {
+		if c.Title == "" {
+			c.Title = fallback
 		}
+		c.Status = "closed"
+		c.EndedAt = time.Now()
+	})
+}
+
+// fallbackTitle derives a title from the first text message of the chat.
+func fallbackTitle(ch *store.Chat) string {
+	msgs, err := ch.TextMessages()
+	if err != nil || len(msgs) == 0 {
+		return ""
 	}
-	ch.Close()
-	return ch.Save()
+	return TruncTitle(msgs[0].Content)
 }
 
 func (m *Manager) summarize(ctx context.Context, ch *store.Chat) {
@@ -81,6 +91,7 @@ func (m *Manager) summarize(ctx context.Context, ch *store.Chat) {
 	if err != nil || len(messages) == 0 {
 		return
 	}
+	fallback := TruncTitle(messages[0].Content)
 
 	var transcript strings.Builder
 	for _, msg := range messages {
@@ -102,26 +113,32 @@ func (m *Manager) summarize(ctx context.Context, ch *store.Chat) {
 
 	if err != nil {
 		log.Error().Err(err).Str("chat", ch.ID).Msg("chat: summarization failed")
-		if ch.Title == "" && len(messages) > 0 {
-			ch.Title = TruncTitle(messages[0].Content)
+		if err := ch.Update(func(c *store.Chat) {
+			if c.Title == "" {
+				c.Title = fallback
+			}
+		}); err != nil {
+			log.Error().Err(err).Str("chat", ch.ID).Msg("chat: failed to save fallback title")
 		}
 		return
 	}
 
-	text := domain.ExtractText(resp.Content)
-	result := parseSummaryJSON(text)
-	if result.Title != "" {
-		ch.Title = result.Title
-	} else if ch.Title == "" && len(messages) > 0 {
-		ch.Title = TruncTitle(messages[0].Content)
-	}
-	ch.Summary = result.Summary
-	ch.Tags = result.Tags
-
-	if err := ch.Save(); err != nil {
+	result := parseSummaryJSON(domain.ExtractText(resp.Content))
+	if err := ch.Update(func(c *store.Chat) {
+		switch {
+		case result.Title != "":
+			c.Title = result.Title
+		case c.Title == "":
+			c.Title = fallback
+		}
+		c.Summary = result.Summary
+		c.Tags = result.Tags
+	}); err != nil {
 		log.Error().Err(err).Str("chat", ch.ID).Msg("chat: failed to save after summarization")
 	}
-	log.Info().Str("chat", ch.ID).Int("user_turns", ch.UserTurns).Str("title", ch.Title).Msg("chat: summarized")
+
+	info := ch.Info()
+	log.Info().Str("chat", ch.ID).Int("user_turns", ch.UserTurnCount()).Str("title", info.Title).Msg("chat: summarized")
 }
 
 func parseSummaryJSON(text string) summaryResult {
@@ -134,10 +151,4 @@ func parseSummaryJSON(text string) summaryResult {
 		}
 	}
 	return result
-}
-
-// bgGuard is embedded in Manager to track in-flight background summarizations.
-type bgGuard struct {
-	bgMu      sync.Mutex
-	bgRunning map[string]bool
 }

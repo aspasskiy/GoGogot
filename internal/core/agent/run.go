@@ -31,8 +31,10 @@ type RunInput struct {
 // a hard failure. On cancellation it emits neither and returns ctx.Err() — the
 // orchestrator closing the event channel is the UI's cleanup signal.
 func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) error {
-	a.sink = sink
+	return a.newRun(sink).execute(ctx, input)
+}
 
+func (r *run) execute(ctx context.Context, input RunInput) error {
 	runStart := time.Now()
 	log.Info().Int("history", len(input.Messages)).Msg("agent.Run start")
 
@@ -43,7 +45,7 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		Content:   input.UserBlocks,
 		Timestamp: time.Now(),
 	}
-	a.emit(transport.MessageEvent{Turn: userTurn})
+	r.emit(transport.MessageEvent{Turn: userTurn})
 
 	msgs := make([]domain.Turn, 0, len(input.Messages)+1)
 	msgs = append(msgs, input.Messages...)
@@ -53,30 +55,34 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 	var finalText string // last assistant text produced; reported in DoneEvent
 	var toolCallCounter int
 
+	// Build the system prompt once per run: an unchanged prefix across
+	// iterations is what lets the provider serve it from the prompt cache.
+	// Changes made mid-run (new skills, identity edits) apply from the next run.
+	sys := r.instructions()
+
 	for iteration := 1; ; iteration++ {
 		if err := ctx.Err(); err != nil {
 			log.Info().Msg("agent.Run cancelled")
 			return err
 		}
 
-		sys := a.instructions()
 		tokensBefore := hook.EstimateTokens(msgs)
 
 		iterCtx := &hook.IterationContext{
 			Iteration:     iteration,
-			Model:         a.client.ModelID(),
+			Model:         r.client.ModelID(),
 			System:        sys,
 			Messages:      msgs,
-			ContextWindow: a.client.ContextWindow(),
-			LLM:           a.client,
+			ContextWindow: r.client.ContextWindow(),
+			LLM:           r.client,
 		}
-		a.emit(transport.LLMStartEvent{})
-		a.runBeforeHooks(ctx, iterCtx)
+		r.emit(transport.LLMStartEvent{})
+		r.runBeforeHooks(ctx, iterCtx)
 
 		// The compaction hook may have rewritten the working set in place.
 		if iterCtx.Compacted {
 			msgs = iterCtx.Messages
-			a.emit(transport.CompactionEvent{
+			r.emit(transport.CompactionEvent{
 				Messages:     append([]domain.Turn(nil), msgs...), // copy: the sink takes ownership
 				BeforeTokens: tokensBefore,
 				AfterTokens:  hook.EstimateTokens(msgs),
@@ -84,9 +90,9 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		}
 
 		callStart := time.Now()
-		resp, err := a.client.Call(ctx, buildLLMMessages(msgs), llm.CallOptions{
+		resp, err := r.client.Call(ctx, buildLLMMessages(msgs), llm.CallOptions{
 			System:     sys,
-			ExtraTools: a.localToolDefs(),
+			ExtraTools: r.localToolDefs,
 		})
 		if err != nil {
 			// Clean cancellation (user /stop or shutdown): exit quietly, no event.
@@ -98,7 +104,7 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 			if errors.Is(err, context.DeadlineExceeded) {
 				msg = "LLM provider did not respond in time. The model may be overloaded — try again later."
 			}
-			a.emit(transport.ErrorEvent{Error: msg})
+			r.emit(transport.ErrorEvent{Error: msg})
 			return err
 		}
 		llmDuration := time.Since(callStart)
@@ -110,12 +116,12 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 			Content:   parsed.assistantBlocks,
 			Timestamp: time.Now(),
 		}
-		a.emit(transport.MessageEvent{Turn: assistantTurn})
+		r.emit(transport.MessageEvent{Turn: assistantTurn})
 		msgs = append(msgs, assistantTurn)
 
 		if parsed.textContent != "" {
 			finalText = parsed.textContent
-			a.emit(transport.LLMStreamEvent{Text: parsed.textContent})
+			r.emit(transport.LLMStreamEvent{Text: parsed.textContent})
 		}
 
 		result := &hook.IterationResult{
@@ -124,7 +130,7 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		}
 
 		if len(parsed.toolCalls) == 0 {
-			a.runAfterHooks(ctx, iterCtx, result)
+			r.runAfterHooks(ctx, iterCtx, result)
 			if result.Usage != nil {
 				total.Add(*result.Usage)
 			}
@@ -132,7 +138,7 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		}
 
 		// --- tool-call loop (single emission point for tool events) ---
-		toolResults, summaries := a.executeToolCallLoop(ctx, parsed.toolCalls, &toolCallCounter)
+		toolResults, summaries := r.executeToolCallLoop(ctx, parsed.toolCalls, &toolCallCounter)
 		result.ToolCalls = summaries
 
 		toolTurn := domain.Turn{
@@ -140,10 +146,10 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 			Content:   toolResults,
 			Timestamp: time.Now(),
 		}
-		a.emit(transport.MessageEvent{Turn: toolTurn})
+		r.emit(transport.MessageEvent{Turn: toolTurn})
 		msgs = append(msgs, toolTurn)
 
-		a.runAfterHooks(ctx, iterCtx, result)
+		r.runAfterHooks(ctx, iterCtx, result)
 		if result.Usage != nil {
 			total.Add(*result.Usage)
 		}
@@ -157,21 +163,21 @@ func (a *Agent) Run(ctx context.Context, input RunInput, sink transport.Sink) er
 		Int("total_tool_calls", total.ToolCalls).
 		Str("total_cost", fmt.Sprintf("$%.4f", total.Cost)).
 		Msg("agent.Run done")
-	a.emit(transport.DoneEvent{Text: finalText, Usage: total})
+	r.emit(transport.DoneEvent{Text: finalText, Usage: total})
 	return nil
 }
 
 const maxDetailLen = 60
 
-func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []domain.ContentBlock, counter *int) ([]domain.ContentBlock, []hook.ToolCallSummary) {
+func (r *run) executeToolCallLoop(ctx context.Context, toolCalls []domain.ContentBlock, counter *int) ([]domain.ContentBlock, []hook.ToolCallSummary) {
 	results := make([]domain.ContentBlock, 0, len(toolCalls))
 	summaries := make([]hook.ToolCallSummary, 0, len(toolCalls))
 
-	toolCtx := transport.WithSink(ctx, a.sink)
+	toolCtx := transport.WithSink(ctx, r.sink)
 
 	for _, tc := range toolCalls {
 		input := unmarshalToolInput(tc.ToolInput)
-		tool, _ := a.lookupTool(tc.ToolName)
+		tool, _ := r.lookupTool(tc.ToolName)
 
 		label := tool.Label
 		if label == "" {
@@ -185,7 +191,7 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []domain.Cont
 			}
 		}
 
-		a.emit(transport.ToolStartEvent{
+		r.emit(transport.ToolStartEvent{
 			Name:   tc.ToolName,
 			Label:  label,
 			Detail: detail,
@@ -193,8 +199,8 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []domain.Cont
 		})
 		*counter++
 
-		if err := a.loopDetector.Check(tc.ToolName, tc.ToolInput); err != nil {
-			a.emit(transport.LoopWarningEvent{
+		if err := r.loopDetector.Check(tc.ToolName, tc.ToolInput); err != nil {
+			r.emit(transport.LoopWarningEvent{
 				Name: tc.ToolName, Reason: err.Error(),
 			})
 			results = append(results, domain.ToolResultBlock(tc.ToolUseID, err.Error(), true))
@@ -203,23 +209,23 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []domain.Cont
 		}
 
 		if tool.Interactive {
-			resp, err := a.handleAskUser(ctx, input)
+			resp, err := r.handleAskUser(ctx, input)
 			isErr := err != nil
 			output := resp
 			if isErr {
 				output = err.Error()
 			}
-			a.emit(transport.ToolEndEvent{Name: tc.ToolName, Result: output})
+			r.emit(transport.ToolEndEvent{Name: tc.ToolName, Result: output})
 			results = append(results, domain.ToolResultBlock(tc.ToolUseID, output, isErr))
 			summaries = append(summaries, hook.ToolCallSummary{Name: tc.ToolName, Duration: 0, IsErr: isErr})
 			continue
 		}
 
 		start := time.Now()
-		toolResult := a.executeTool(toolCtx, tc.ToolName, input)
+		toolResult := r.executeTool(toolCtx, tc.ToolName, input)
 		elapsed := time.Since(start)
 
-		a.emit(transport.ToolEndEvent{
+		r.emit(transport.ToolEndEvent{
 			Name: tc.ToolName, Result: toolResult.Output, DurationMs: elapsed.Milliseconds(),
 		})
 
@@ -230,7 +236,7 @@ func (a *Agent) executeToolCallLoop(ctx context.Context, toolCalls []domain.Cont
 	return results, summaries
 }
 
-func (a *Agent) handleAskUser(ctx context.Context, input map[string]any) (string, error) {
+func (r *run) handleAskUser(ctx context.Context, input map[string]any) (string, error) {
 	question, _ := input["question"].(string)
 	kind := transport.AskKind(tooltypes.GetStringOpt(input, "kind"))
 	if kind == "" {
@@ -254,7 +260,7 @@ func (a *Agent) handleAskUser(ctx context.Context, input map[string]any) (string
 	// the agent would block here forever). If the run is cancelled the event is
 	// abandoned and the ctx.Done branch below unblocks us.
 	replyCh := make(chan string, 1)
-	a.emit(transport.AskEvent{
+	r.emit(transport.AskEvent{
 		Prompt:  question,
 		Kind:    kind,
 		Options: options,

@@ -47,7 +47,7 @@ type Store interface {
 type ChatPersister interface {
 	SaveChat(ch *Chat) error
 	LoadMessages(ch *Chat) error
-	AppendMessage(ch *Chat, msg domain.Turn)
+	AppendMessage(ch *Chat, msg domain.Turn) error
 	ReplaceMessages(ch *Chat, msgs []domain.Turn) error
 	TextMessages(ch *Chat) ([]Message, error)
 	HasMessages(ch *Chat) bool

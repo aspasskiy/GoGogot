@@ -53,7 +53,9 @@ func TestAppendMessage_ConcurrentNoLoss(t *testing.T) {
 				},
 				Timestamp: time.Now(),
 			}
-			s.AppendMessage(ch, msg)
+			if err := s.AppendMessage(ch, msg); err != nil {
+				t.Errorf("AppendMessage: %v", err)
+			}
 		}(i)
 	}
 	close(start)
@@ -73,11 +75,13 @@ func TestAppendMessage_SequentialRoundTrip(t *testing.T) {
 	s, ch := newConcurrentChatTestStore(t)
 
 	for i := 0; i < 5; i++ {
-		s.AppendMessage(ch, domain.Turn{
+		if err := s.AppendMessage(ch, domain.Turn{
 			Role:      "user",
 			Content:   []domain.ContentBlock{domain.TextBlock(fmt.Sprintf("seq-%d", i))},
 			Timestamp: time.Now(),
-		})
+		}); err != nil {
+			t.Fatalf("AppendMessage: %v", err)
+		}
 	}
 
 	fresh := &store.Chat{ID: ch.ID, StartedAt: ch.StartedAt}

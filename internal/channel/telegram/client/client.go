@@ -30,8 +30,9 @@ func (c *Client) Start(ctx context.Context) {
 	c.b.Start(ctx)
 }
 
-func (c *Client) SetMyCommands(ctx context.Context, commands []models.BotCommand) {
-	c.b.SetMyCommands(ctx, &bot.SetMyCommandsParams{Commands: commands})
+func (c *Client) SetMyCommands(ctx context.Context, commands []models.BotCommand) error {
+	_, err := c.b.SetMyCommands(ctx, &bot.SetMyCommandsParams{Commands: commands})
+	return err
 }
 
 // EscapeMarkdown escapes special characters for Telegram MarkdownV2.

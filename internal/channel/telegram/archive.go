@@ -81,7 +81,7 @@ func extractZipFiles(data []byte) ([]transport.Attachment, error) {
 			continue
 		}
 		content, err := io.ReadAll(rc)
-		rc.Close()
+		_ = rc.Close()
 		if err != nil {
 			continue
 		}
@@ -104,7 +104,7 @@ func extractTarGzFiles(data []byte) ([]transport.Attachment, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read gzip: %w", err)
 	}
-	defer gzr.Close()
+	defer func() { _ = gzr.Close() }()
 
 	tr := tar.NewReader(gzr)
 	var attachments []transport.Attachment

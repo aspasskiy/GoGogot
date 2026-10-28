@@ -28,12 +28,13 @@ func newAgentSink(ctx context.Context, chat *store.Chat, bus *transport.Bus) *ag
 func (s *agentSink) Emit(ev transport.Event) {
 	switch e := ev.(type) {
 	case transport.MessageEvent:
-		// Append to history: writes the existing messages.jsonl, bumps
-		// UserTurns, and folds any per-turn usage — unchanged store behavior.
-		s.chat.AppendMessage(e.Turn)
-		// Persist chat metadata (UserTurns, UpdatedAt) after user-role turns —
-		// the same cadence the agent's conv.Save() used before the refactor
-		// (after the user message and after each tool-result turn).
+		// Append to history: writes messages.jsonl, bumps UserTurns for turns
+		// the user sent, and folds any per-turn usage.
+		if err := s.chat.AppendMessage(e.Turn); err != nil {
+			log.Error().Err(err).Str("chat", s.chat.ID).Msg("orchestrator: append message failed")
+		}
+		// Persist chat metadata (UserTurns, UpdatedAt) after user-role turns
+		// (the user message and each tool-result turn).
 		if e.Turn.Role == string(domain.RoleUser) {
 			if err := s.chat.Save(); err != nil {
 				log.Error().Err(err).Str("chat", s.chat.ID).Msg("orchestrator: save chat failed")
@@ -46,7 +47,7 @@ func (s *agentSink) Emit(ev transport.Event) {
 		}
 
 	case transport.DoneEvent:
-		s.chat.TotalUsage().Add(e.Usage)
+		s.chat.AddUsage(e.Usage)
 		s.bus.Emit(ev)
 
 	case transport.AskEvent:

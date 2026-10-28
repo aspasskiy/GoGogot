@@ -86,6 +86,7 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 		return nil, err
 	}
 	provider.Timeout = cfg.LLM.Timeout
+	provider.MaxTokens = cfg.LLM.MaxTokens
 
 	sched := scheduler.New(cfg.DataDir, nil, st.LoadTimezone(), scheduler.Options{
 		TaskTimeout:   cfg.Scheduler.TaskTimeout,
@@ -126,7 +127,6 @@ func buildEngine(cfg *config.Config, ch channel.Channel) (*core.Engine, error) {
 		Agent:     ag,
 		Chats:     chatMgr,
 		Scheduler: sched,
-		Registry:  reg,
 	}), nil
 }
 

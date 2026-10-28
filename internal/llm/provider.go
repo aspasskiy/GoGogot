@@ -11,17 +11,27 @@ import (
 )
 
 type Provider struct {
-	ID              string        `json:"id"`
-	Label           string        `json:"label"`
-	Model           string        `json:"model"`
-	BaseURL         string        `json:"base_url,omitempty"`
-	APIKey          string        `json:"-"`
-	Format          string        `json:"format,omitempty"`
-	ContextWindow   int           `json:"context_window"`
-	SupportsVision  bool          `json:"supports_vision,omitempty"`
-	InputPricePerM  float64       `json:"-"`
-	OutputPricePerM float64       `json:"-"`
-	Timeout         time.Duration `json:"-"` // per-LLM-call timeout (0 = no per-call deadline)
+	ID              string  `json:"id"`
+	Label           string  `json:"label"`
+	Model           string  `json:"model"`
+	BaseURL         string  `json:"base_url,omitempty"`
+	APIKey          string  `json:"-"`
+	Format          string  `json:"format,omitempty"`
+	ContextWindow   int     `json:"context_window"`
+	SupportsVision  bool    `json:"supports_vision,omitempty"`
+	InputPricePerM  float64 `json:"-"`
+	OutputPricePerM float64 `json:"-"`
+
+	// Prompt caching. CacheReadPricePerM/CacheWritePricePerM are zero when the
+	// model has no cache rate. CacheControl is set for models that cache only
+	// at explicit cache_control breakpoints (Claude); models with automatic
+	// caching (OpenAI, DeepSeek, Gemini) or none need nothing in the request.
+	CacheReadPricePerM  float64 `json:"-"`
+	CacheWritePricePerM float64 `json:"-"`
+	CacheControl        bool    `json:"-"`
+
+	Timeout   time.Duration `json:"-"` // per-LLM-call timeout (0 = no per-call deadline)
+	MaxTokens int           `json:"-"` // default max output tokens per call (0 = 4096)
 }
 
 var aliases = map[string]string{
@@ -126,12 +136,29 @@ func ResolveProvider(modelID, provider string) (*Provider, error) {
 	}
 }
 
+// Anthropic prompt-cache prices relative to the base input price
+// (5-minute cache: reads at 0.1x, writes at 1.25x).
+const (
+	anthropicCacheReadMultiplier  = 0.1
+	anthropicCacheWriteMultiplier = 1.25
+)
+
 func resolveAnthropic(model string) (*Provider, error) {
 	apiKey := os.Getenv("ANTHROPIC_API_KEY")
 	if apiKey == "" {
 		return nil, fmt.Errorf("ANTHROPIC_API_KEY not set for model %q", model)
 	}
-	return providerFromDef(getAnthropicCatalog()[model], model, apiKey, "", "anthropic"), nil
+	p := providerFromDef(getAnthropicCatalog()[model], model, apiKey, "", "anthropic")
+	// Every Claude model caches at explicit breakpoints, with the same price
+	// multipliers relative to the base input price.
+	p.CacheControl = true
+	if p.CacheReadPricePerM == 0 {
+		p.CacheReadPricePerM = p.InputPricePerM * anthropicCacheReadMultiplier
+	}
+	if p.CacheWritePricePerM == 0 {
+		p.CacheWritePricePerM = p.InputPricePerM * anthropicCacheWriteMultiplier
+	}
+	return p, nil
 }
 
 func resolveOpenAI(model string) (*Provider, error) {
@@ -160,7 +187,11 @@ func resolveOpenRouter(id, slug string) (*Provider, error) {
 		p.SupportsVision = def.Vision
 		p.InputPricePerM = def.InputPricePerM
 		p.OutputPricePerM = def.OutputPricePerM
+		p.CacheReadPricePerM = def.CacheReadPricePerM
+		p.CacheWritePricePerM = def.CacheWritePricePerM
 	}
+	// Claude behind OpenRouter still needs explicit breakpoints.
+	p.CacheControl = strings.HasPrefix(slug, "anthropic/")
 
 	return p, nil
 }
@@ -171,6 +202,7 @@ func providerFromDef(def catalog.ModelDef, model, apiKey, baseURL, format string
 		BaseURL: baseURL, APIKey: apiKey, Format: format,
 		ContextWindow: def.ContextWindow, SupportsVision: def.Vision,
 		InputPricePerM: def.InputPricePerM, OutputPricePerM: def.OutputPricePerM,
+		CacheReadPricePerM: def.CacheReadPricePerM, CacheWritePricePerM: def.CacheWritePricePerM,
 	}
 }
 

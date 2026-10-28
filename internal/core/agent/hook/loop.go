@@ -40,8 +40,8 @@ func (ld *LoopDetector) Check(name string, argsRaw []byte) error {
 	ld.record(name, h)
 	if n := ld.consecutiveCount(); n >= ld.threshold {
 		return fmt.Errorf(
-			"Loop detected: %s called %d times with identical arguments. "+
-				"Stop repeating and explain the situation to the user.",
+			"loop detected: %s called %d times with identical arguments; "+
+				"stop repeating and explain the situation to the user",
 			name, n,
 		)
 	}

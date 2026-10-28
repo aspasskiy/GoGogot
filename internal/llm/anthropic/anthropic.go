@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/aspasskiy/gogogot/internal/domain"
@@ -14,14 +13,14 @@ import (
 )
 
 type Adapter struct {
-	client *anthropic.Client
+	client       *anthropic.Client
+	cacheControl bool // add prompt-cache breakpoints to each request
 }
 
-func NewAdapter(apiKey, baseURL string) *Adapter {
-	httpClient := &http.Client{Timeout: 5 * time.Minute}
-	opts := []option.RequestOption{
-		option.WithHTTPClient(httpClient),
-	}
+// NewAdapter builds the Anthropic adapter. Request deadlines come from the
+// caller's context (llm.Client applies the configured per-call timeout).
+func NewAdapter(apiKey, baseURL string, cacheControl bool) *Adapter {
+	var opts []option.RequestOption
 	if apiKey != "" {
 		opts = append(opts, option.WithAPIKey(apiKey))
 	}
@@ -29,7 +28,7 @@ func NewAdapter(apiKey, baseURL string) *Adapter {
 		opts = append(opts, option.WithBaseURL(baseURL))
 	}
 	api := anthropic.NewClient(opts...)
-	return &Adapter{client: &api}
+	return &Adapter{client: &api, cacheControl: cacheControl}
 }
 
 func (a *Adapter) Call(
@@ -46,11 +45,16 @@ func (a *Adapter) Call(
 	params := anthropic.MessageNewParams{
 		Model:     anthropic.Model(model),
 		MaxTokens: int64(maxTokens),
-		System:    []anthropic.TextBlockParam{{Text: systemPrompt}},
 		Messages:  anthMsgs,
+	}
+	if systemPrompt != "" {
+		params.System = []anthropic.TextBlockParam{{Text: systemPrompt}}
 	}
 	if len(anthTools) > 0 {
 		params.Tools = anthTools
+	}
+	if a.cacheControl {
+		addCacheBreakpoints(&params)
 	}
 
 	start := time.Now()
@@ -60,6 +64,29 @@ func (a *Adapter) Call(
 	}
 
 	return anthropicToResponse(msg), nil
+}
+
+// addCacheBreakpoints marks the request prefix for prompt caching: the tool
+// list, the system prompt and the newest message. Each agent iteration
+// re-sends the previous iteration's prefix, so it is read from the cache at a
+// fraction of the input price. The API allows up to 4 breakpoints.
+func addCacheBreakpoints(params *anthropic.MessageNewParams) {
+	if n := len(params.Tools); n > 0 {
+		if cc := params.Tools[n-1].GetCacheControl(); cc != nil {
+			*cc = anthropic.NewCacheControlEphemeralParam()
+		}
+	}
+	if n := len(params.System); n > 0 {
+		params.System[n-1].CacheControl = anthropic.NewCacheControlEphemeralParam()
+	}
+	if n := len(params.Messages); n > 0 {
+		blocks := params.Messages[n-1].Content
+		if m := len(blocks); m > 0 {
+			if cc := blocks[m-1].GetCacheControl(); cc != nil {
+				*cc = anthropic.NewCacheControlEphemeralParam()
+			}
+		}
+	}
 }
 
 func messagesToAnthropic(msgs []domain.Message) []anthropic.MessageParam {
@@ -119,6 +146,9 @@ func anthropicToResponse(msg *anthropic.Message) *domain.Response {
 		StopReason:   string(msg.StopReason),
 		InputTokens:  int(msg.Usage.InputTokens),
 		OutputTokens: int(msg.Usage.OutputTokens),
+
+		CacheReadTokens:  int(msg.Usage.CacheReadInputTokens),
+		CacheWriteTokens: int(msg.Usage.CacheCreationInputTokens),
 	}
 	for _, block := range msg.Content {
 		switch block.Type {

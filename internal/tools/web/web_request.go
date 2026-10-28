@@ -87,7 +87,7 @@ func webRequest(ctx context.Context, input map[string]any) types.Result {
 	if err != nil {
 		return types.Errf("http error: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxRequestBody))
 	if err != nil {

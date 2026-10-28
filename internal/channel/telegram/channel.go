@@ -51,7 +51,7 @@ func (c *Channel) newReplier(chatID int64) *replier {
 func (c *Channel) Run(ctx context.Context, handler channel.Handler) error {
 	c.handler = handler
 
-	c.client.SetMyCommands(ctx, []models.BotCommand{
+	err := c.client.SetMyCommands(ctx, []models.BotCommand{
 		{Command: "new", Description: "Start a fresh conversation"},
 		{Command: "history", Description: "View past conversations"},
 		{Command: "memory", Description: "List memory files"},
@@ -60,6 +60,9 @@ func (c *Channel) Run(ctx context.Context, handler channel.Handler) error {
 		{Command: "stop", Description: "Cancel the current task"},
 		{Command: "help", Description: "Show available commands"},
 	})
+	if err != nil {
+		log.Warn().Err(err).Msg("telegram: failed to set bot commands")
+	}
 
 	log.Info().Int64("owner_id", c.ownerID).Msg("telegram bot polling started")
 	c.client.Start(ctx)

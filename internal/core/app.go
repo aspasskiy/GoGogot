@@ -12,7 +12,6 @@ import (
 	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/scheduler"
 	"github.com/aspasskiy/gogogot/internal/store"
-	"github.com/aspasskiy/gogogot/internal/tools"
 	"github.com/aspasskiy/gogogot/internal/transport"
 
 	"github.com/rs/zerolog/log"
@@ -20,7 +19,7 @@ import (
 
 type activeRun struct {
 	cancel     context.CancelFunc
-	replyInbox chan string // unbuffered; used for ask_user responses
+	replyInbox chan string // unbuffered; used for ask_user responses (nil for scheduled runs)
 }
 
 type Engine struct {
@@ -29,7 +28,10 @@ type Engine struct {
 	store     store.Store
 	chats     *chat.Manager
 	scheduler *scheduler.Scheduler
-	registry  *tools.Registry
+
+	// slot holds a token while a run is in progress: at most one agent run
+	// (user message or scheduled task) is active at a time.
+	slot chan struct{}
 
 	mu     sync.Mutex
 	active *activeRun
@@ -41,7 +43,6 @@ type Params struct {
 	Agent     *agent.Agent
 	Chats     *chat.Manager
 	Scheduler *scheduler.Scheduler
-	Registry  *tools.Registry
 }
 
 func New(p Params) *Engine {
@@ -51,7 +52,7 @@ func New(p Params) *Engine {
 		agent:     p.Agent,
 		chats:     p.Chats,
 		scheduler: p.Scheduler,
-		registry:  p.Registry,
+		slot:      make(chan struct{}, 1),
 	}
 
 	ownerReply := p.Channel.OwnerReplier()
@@ -71,21 +72,13 @@ func (e *Engine) Run(ctx context.Context) error {
 	return e.ch.Run(ctx, e.handleMessage)
 }
 
-func (e *Engine) Channel() channel.Channel {
-	return e.ch
-}
-
 func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 	if msg.Command != nil {
 		e.handleCommand(ctx, msg)
 		return
 	}
 
-	e.mu.Lock()
-	run := e.active
-	e.mu.Unlock()
-
-	if run != nil {
+	if run := e.current(); run != nil {
 		select {
 		case run.replyInbox <- msg.Text:
 			return
@@ -99,12 +92,24 @@ func (e *Engine) handleMessage(ctx context.Context, msg channel.Message) {
 		return
 	}
 
+	agentCtx, cancel := context.WithCancel(ctx)
+	run := &activeRun{cancel: cancel, replyInbox: make(chan string)}
+	if !e.tryAcquire(run) {
+		cancel()
+		_ = msg.Reply.SendText(ctx, "Still working on the previous task, please wait...")
+		return
+	}
+
 	log.Info().
 		Int("text_len", len(msg.Text)).
 		Int("attachments", len(msg.Attachments)).
 		Msg("engine: incoming message")
 
-	go e.runAgent(ctx, msg)
+	go func() {
+		defer e.release()
+		defer cancel()
+		e.runAgent(ctx, agentCtx, run, msg)
+	}()
 }
 
 func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
@@ -139,30 +144,51 @@ func (e *Engine) handleCommand(ctx context.Context, msg channel.Message) {
 	}
 }
 
-// setActive marks the engine as busy and returns a release function.
-// Caller must defer the release.
-func (e *Engine) setActive(run *activeRun) func() {
+// tryAcquire claims the run slot without waiting. It returns false when
+// another run is in progress.
+func (e *Engine) tryAcquire(run *activeRun) bool {
+	select {
+	case e.slot <- struct{}{}:
+	default:
+		return false
+	}
+	e.setActive(run)
+	return true
+}
+
+// acquire claims the run slot, waiting until it is free or ctx is done.
+func (e *Engine) acquire(ctx context.Context, run *activeRun) error {
+	select {
+	case e.slot <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	e.setActive(run)
+	return nil
+}
+
+// release frees the run slot taken by tryAcquire or acquire.
+func (e *Engine) release() {
+	e.setActive(nil)
+	<-e.slot
+}
+
+func (e *Engine) setActive(run *activeRun) {
 	e.mu.Lock()
 	e.active = run
 	e.mu.Unlock()
-	return func() {
-		e.mu.Lock()
-		e.active = nil
-		e.mu.Unlock()
-	}
 }
 
-func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
+func (e *Engine) current() *activeRun {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.active
+}
+
+// runAgent executes one user-initiated run. ctx is the channel context (used
+// for replies that must outlive a /stop); agentCtx is cancelled by /stop.
+func (e *Engine) runAgent(ctx, agentCtx context.Context, run *activeRun, msg channel.Message) {
 	reply := msg.Reply
-
-	agentCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	run := &activeRun{
-		cancel:     cancel,
-		replyInbox: make(chan string),
-	}
-	defer e.setActive(run)()
 
 	bus, recv := transport.NewBus(64)
 
@@ -201,10 +227,7 @@ func (e *Engine) runAgent(ctx context.Context, msg channel.Message) {
 }
 
 func (e *Engine) stopAgent(cmd *channel.Command) {
-	e.mu.Lock()
-	run := e.active
-	e.mu.Unlock()
-
+	run := e.current()
 	if run == nil {
 		cmd.Result.Data = map[string]string{"text": "Nothing to cancel."}
 		return
@@ -216,22 +239,19 @@ func (e *Engine) stopAgent(cmd *channel.Command) {
 
 // RunScheduledTask executes a scheduled task in the active chat.
 // It runs synchronously and returns the agent's text output.
-// If the agent is already busy, it returns an error so the scheduler can
-// apply backoff and retry later.
+// If another run is in progress it waits for it to finish; ctx (the
+// scheduler's task timeout) bounds the wait and the run together. A task that
+// never got the slot returns scheduler.ErrBusy.
 func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, taskID, command, skill string) (string, error) {
-	e.mu.Lock()
-	busy := e.active != nil
-	e.mu.Unlock()
-	if busy {
-		return "", fmt.Errorf("agent busy, will retry")
-	}
-
 	agentCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	agentCtx = transport.WithReplier(agentCtx, reply)
 
-	run := &activeRun{cancel: cancel, replyInbox: make(chan string)}
-	defer e.setActive(run)()
+	run := &activeRun{cancel: cancel}
+	if err := e.acquire(ctx, run); err != nil {
+		return "", fmt.Errorf("%w: %v", scheduler.ErrBusy, err)
+	}
+	defer e.release()
 
 	bus, recv := transport.NewBus(64)
 
@@ -262,8 +282,13 @@ func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, 
 	// by DoneEvent (not reconstructed from the streaming events).
 	var finalText string
 	for ev := range recv {
-		if d, ok := ev.(transport.DoneEvent); ok {
-			finalText = d.Text
+		switch ev := ev.(type) {
+		case transport.DoneEvent:
+			finalText = ev.Text
+		case transport.AskEvent:
+			// Nobody is watching a scheduled run: answer right away instead of
+			// leaving the agent blocked until the task timeout.
+			ev.ReplyCh <- "(no interactive input available in a scheduled task — decide on your own)"
 		}
 	}
 	<-done
@@ -275,6 +300,8 @@ func (e *Engine) RunScheduledTask(ctx context.Context, reply transport.Replier, 
 	if finalText != "" {
 		_ = reply.SendText(ctx, finalText)
 	}
+
+	e.chats.SummarizeIfNeeded(context.WithoutCancel(ctx), ch)
 
 	return finalText, nil
 }

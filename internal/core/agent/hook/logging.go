@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
@@ -23,14 +24,16 @@ func LoggingBeforeIteration() BeforeIterationFunc {
 	}
 }
 
-func LoggingAfterIteration(inputPricePerM, outputPricePerM float64) AfterIterationFunc {
+func LoggingAfterIteration(pricing domain.Pricing) AfterIterationFunc {
 	return func(_ context.Context, ic *IterationContext, result *IterationResult) {
 		resp := result.Response
-		cost := CalcCost(inputPricePerM, outputPricePerM, resp.InputTokens, resp.OutputTokens)
+		cost := pricing.Cost(resp)
 		evt := log.Info().
 			Int("iteration", ic.Iteration).
 			Str("elapsed", formatDuration(result.LLMDuration)).
 			Int("in_tokens", resp.InputTokens).
+			Int("cache_read", resp.CacheReadTokens).
+			Int("cache_write", resp.CacheWriteTokens).
 			Int("out_tokens", resp.OutputTokens).
 			Str("cost", fmt.Sprintf("$%.4f", cost)).
 			Str("stop", resp.StopReason)

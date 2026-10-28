@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"sort"
 
 	"github.com/aspasskiy/gogogot/internal/domain"
 	"github.com/aspasskiy/gogogot/internal/store"
@@ -52,6 +53,8 @@ func (r *Registry) Execute(ctx context.Context, name string, input map[string]an
 	return t.Handler(ctx, input)
 }
 
+// Definitions returns the tool definitions sorted by name. A stable order keeps
+// the request prefix identical between calls, which prompt caching depends on.
 func (r *Registry) Definitions() []domain.ToolDef {
 	out := make([]domain.ToolDef, 0, len(r.tt))
 	for _, t := range r.tt {
@@ -62,14 +65,11 @@ func (r *Registry) Definitions() []domain.ToolDef {
 			Required:    t.Required,
 		})
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
 	return out
 }
 
 func (r *Registry) Lookup(name string) (types.Tool, bool) {
 	t, ok := r.tt[name]
 	return t, ok
-}
-
-func (r *Registry) Register(t types.Tool) {
-	r.tt[t.Name] = t
 }
